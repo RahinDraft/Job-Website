@@ -1433,7 +1433,7 @@ export default function App() {
   };
 
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
-    siteName: 'জব পোর্টাল',
+    siteName: 'চাকরি সেবা',
     primaryColor: '#059669',
     contactEmail: '',
     contactPhone: '',
@@ -1442,12 +1442,12 @@ export default function App() {
     applicationFee: '0',
     noticeText: '',
     heroTitle: 'আপনার স্বপ্নের চাকরি খুঁজুন',
-    heroSubtitle: 'বাংলাদেশের সবচেয়ে বিশ্বস্ত জব পোর্টাল',
-    footerText: '© 2026 Job Portal. All rights reserved.',
+    heroSubtitle: 'বাংলাদেশের সবচেয়ে বিশ্বস্ত চাকরি সেবা প্ল্যাটফর্ম',
+    footerText: `© ${new Date().getFullYear()} চাকরি সেবা। সর্বস্বত্ব সংরক্ষিত।`,
     facebookLink: '',
     youtubeLink: '',
     logoUrl: '',
-    aboutText: 'আমরা বাংলাদেশের অন্যতম প্রধান জব পোর্টাল। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।',
+    aboutText: 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।',
     contactAddress: 'ঢাকা, বাংলাদেশ',
     paymentInstructions: 'নিচের যেকোনো নাম্বারে সেন্ড মানি করে Transaction ID (TrxID) দিন।',
     seoTitle: 'Job Portal - Find Your Dream Job',
@@ -3890,45 +3890,6 @@ export default function App() {
 
           {/* New Sections based on Images - MOVED BELOW JOBS */}
           
-          {/* 1. সহজ ৫ ধাপে আবেদন প্রক্রিয়া */}
-          <section className="py-24 bg-gray-50">
-            <div className="max-w-7xl mx-auto px-4 lg:px-8 text-center">
-              <div className="flex flex-col items-center gap-4 mb-16">
-                <div className="px-4 py-1.5 bg-amber-100 text-amber-700 rounded-full text-xs font-black uppercase tracking-widest">কিভাবে কাজ করে</div>
-                <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-8 bg-amber-500 rounded-full" />
-                  <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">সহজ ৫ ধাপে আবেদন প্রক্রিয়া</h2>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-8 relative">
-                <div className="absolute top-1/2 left-0 w-full h-0.5 bg-amber-200 -translate-y-1/2 hidden lg:block" />
-                {[
-                  { icon: <Search className="w-6 h-6" />, title: "১. অর্ডার দিন", desc: "পছন্দের জব সিলেক্ট করে অর্ডারের অনুরোধ করুন।" },
-                  { icon: <UserCircle className="w-6 h-6" />, title: "২. আমরা আবেদন করব", desc: "আপনার প্রোফাইল থেকে তথ্য নিয়ে আমরা আবেদন করব।" },
-                  { icon: <ShieldCheck className="w-6 h-6" />, title: "৩. ড্রাফট চেক", desc: "আবেদন সঠিক হয়েছে কিনা ড্রাফট চেক করবেন।" },
-                  { icon: <CreditCard className="w-6 h-6" />, title: "৪. পেমেন্ট করুন", desc: "সবকিছু ঠিক থাকলে পেমেন্ট সম্পন্ন করবেন।" },
-                  { icon: <FileText className="w-6 h-6" />, title: "৫. মূল কপি", desc: "অরিজিনাল পিডিএফ কপিটি ডাউনলোড করুন।" }
-                ].map((step, i) => (
-                  <motion.div 
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.1 }}
-                    className="flex flex-col items-center group relative z-10"
-                  >
-                    <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center text-amber-500 mb-6 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 border-2 border-transparent group-hover:border-amber-500">
-                      {step.icon}
-                    </div>
-                    <h3 className="font-black text-gray-900 mb-2 truncate w-full">{step.title}</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed font-medium">{step.desc}</p>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </section>
-
           {/* 2. একবার প্রোফাইল, আজীবন সুবিধা */}
           <section className="py-24 bg-white overflow-hidden">
             <div className="max-w-7xl mx-auto px-4 lg:px-8">
@@ -4088,10 +4049,10 @@ export default function App() {
                     <Briefcase className="w-6 h-6 text-white" />
                   </div>
                 )}
-                {!siteSettings.logoUrl && <h1 className="text-xl font-bold text-emerald-800">{siteSettings.siteName || 'জব পোর্টাল'}</h1>}
+                {!siteSettings.logoUrl && <h1 className="text-xl font-bold text-emerald-800">{siteSettings.siteName || 'চাকরি সেবা'}</h1>}
               </div>
               <p className="text-gray-500 text-sm max-w-md leading-relaxed">
-                {siteSettings.aboutText || 'আমরা বাংলাদেশের অন্যতম প্রধান জব পোর্টাল। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।'}
+                {siteSettings.aboutText || 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।'}
               </p>
               
               <div className="flex items-center gap-4 mt-8">
