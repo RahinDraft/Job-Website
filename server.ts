@@ -177,27 +177,34 @@ async function startServer() {
       INSERT OR IGNORE INTO site_stats (id, total_visitors) VALUES (1, 0);
       
       -- Default Settings
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('siteName', 'জব পোর্টাল');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('primaryColor', '#10b981');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('siteName', 'চাকরি সেবা');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('primaryColor', '#059669');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('contactPhone', '01700000000');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('contactEmail', 'info@jobportal.com');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('noticeText', 'আমাদের সাইটে আপনাকে স্বাগতম! নতুন নতুন চাকরির আপডেট পেতে নিয়মিত ভিজিট করুন।');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('contactEmail', 'info@chakriseba.com');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('noticeText', 'আমাদের সাইটে আপনাকে স্বাগতম! চাকরি সেবা - আপনার ক্যারিয়ারের বিশ্বস্ত সঙ্গী।');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('bkashNumber', '01700000000');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('nagadNumber', '01700000000');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('applicationFee', '১০০');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('heroTitle', 'আপনার স্বপ্নের চাকরি খুঁজুন');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('heroSubtitle', 'বাংলাদেশের সবচেয়ে বিশ্বস্ত জব পোর্টাল');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('footerText', '© 2026 Job Portal. All rights reserved.');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('heroSubtitle', 'বাংলাদেশের সবচেয়ে বিশ্বস্ত চাকরি সেবা প্ল্যাটফর্ম');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('footerText', '© 2026 চাকরি সেবা। সর্বস্বত্ব সংরক্ষিত।');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('facebookLink', '');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('youtubeLink', '');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('logoUrl', '');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('aboutText', 'আমরা বাংলাদেশের অন্যতম প্রধান জব পোর্টাল। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('aboutText', 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('contactAddress', 'ঢাকা, বাংলাদেশ');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('paymentInstructions', 'নিচের যেকোনো নাম্বারে সেন্ড মানি করে Transaction ID (TrxID) দিন।');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('seoTitle', 'Job Portal - Find Your Dream Job');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('seoDescription', 'The best job portal in Bangladesh to find government and private jobs.');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('seoTitle', 'চাকরি সেবা - বাংলাদেশের ১ নম্বর চাকরির পোর্টাল | Chakri Seba');
+      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('seoDescription', 'সরকারি ও বেসরকারি চাকরির সবশেষ সার্কুলার ও ঘরে বসে সহজে আবেদনের বিশ্বস্ত মাধ্যম।');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('serviceCharge', '50');
       INSERT OR IGNORE INTO site_settings (key, value) VALUES ('whatsappNumber', '01700000000');
+
+      -- Force update existing settings to ensure the change is visible immediately
+      UPDATE site_settings SET value = 'চাকরি সেবা' WHERE key = 'siteName';
+      UPDATE site_settings SET value = 'বাংলাদেশের সবচেয়ে বিশ্বস্ত চাকরি সেবা প্ল্যাটফর্ম' WHERE key = 'heroSubtitle';
+      UPDATE site_settings SET value = 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।' WHERE key = 'aboutText';
+      UPDATE site_settings SET value = 'চাকরি সেবা - বাংলাদেশের ১ নম্বর চাকরির পোর্টাল | Chakri Seba' WHERE key = 'seoTitle';
+      UPDATE site_settings SET value = 'সরকারি ও বেসরকারি চাকরির সবশেষ সার্কুলার ও ঘরে বসে সহজে আবেদনের বিশ্বস্ত মাধ্যম।' WHERE key = 'seoDescription';
     `);
     console.log("Database tables initialized.");
   } catch (err) {

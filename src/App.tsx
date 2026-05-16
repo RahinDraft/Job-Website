@@ -1450,8 +1450,8 @@ export default function App() {
     aboutText: 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।',
     contactAddress: 'ঢাকা, বাংলাদেশ',
     paymentInstructions: 'নিচের যেকোনো নাম্বারে সেন্ড মানি করে Transaction ID (TrxID) দিন।',
-    seoTitle: 'Job Portal - Find Your Dream Job',
-    seoDescription: 'The best job portal in Bangladesh to find government and private jobs.',
+    seoTitle: 'চাকরি সেবা - বাংলাদেশের ১ নম্বর চাকরির পোর্টাল | Chakri Seba',
+    seoDescription: 'সরকারি ও বেসরকারি চাকরির সবশেষ সার্কুলার ও ঘরে বসে সহজে আবেদনের বিশ্বস্ত মাধ্যম।',
     serviceCharge: '50',
     whatsappNumber: '01700000000'
   });
@@ -3454,7 +3454,7 @@ export default function App() {
                 <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-emerald-600 to-emerald-800 bg-clip-text text-transparent">
                   {siteSettings.siteName}
                 </h1>
-                <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Trusted Job Portal</span>
+                <span className="text-[10px] text-gray-400 font-bold tracking-[0.2em] uppercase">Trusted Job Seva</span>
               </div>
             </div>
 
@@ -3974,7 +3974,7 @@ export default function App() {
                 <div className="bg-emerald-600 p-10 rounded-[2.5rem] shadow-2xl shadow-emerald-500/20 relative overflow-hidden group">
                   <Sparkles className="absolute -top-6 -right-6 w-32 h-32 text-white/10 group-hover:rotate-12 transition-transform" />
                   <h3 className="text-2xl font-black text-white mb-8 flex items-center gap-3 text-left">
-                    <Check className="w-6 h-6" /> JobApply BD সমাধান
+                    <Check className="w-6 h-6" /> চাকরি সেবা সমাধান
                   </h3>
                   <ul className="space-y-6">
                     {[
@@ -4011,7 +4011,7 @@ export default function App() {
                 <div className="text-left space-y-10">
                   <div className="flex items-center gap-3">
                     <div className="w-1.5 h-10 bg-emerald-600 rounded-full" />
-                    <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">আস্থার নাম JobApply BD</h2>
+                    <h2 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight">আস্থার নাম চাকরি সেবা</h2>
                   </div>
                   
                   <p className="text-xl text-gray-500 font-medium leading-relaxed">
