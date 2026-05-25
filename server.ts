@@ -1,11 +1,11 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import Database from "better-sqlite3";
 import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
 import multer from "multer";
 import fs from "fs";
+import { dbClient } from "./db-client.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,239 +31,15 @@ const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
 });
 
-let db: Database.Database;
-
 async function startServer() {
-  console.log("Starting server initialization...");
-  try {
-    db = new Database("jobs.db");
-    console.log("Database connected.");
-  } catch (err) {
-    console.error("Failed to connect to database:", err);
-    process.exit(1);
-  }
-
-  // Initialize Database
-  try {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS jobs (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        company TEXT NOT NULL,
-        category TEXT NOT NULL,
-        location TEXT NOT NULL,
-        deadline TEXT NOT NULL,
-        description TEXT NOT NULL,
-        requirements TEXT NOT NULL,
-        salary TEXT,
-        companyLogoUrl TEXT,
-        circularImageUrl TEXT,
-        positions TEXT,
-        applicationFee TEXT,
-        searchKeywords TEXT,
-        seoTitle TEXT,
-        seoDescription TEXT,
-        minEducationLevel INTEGER DEFAULT 0,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'user',
-        fullName TEXT,
-        email TEXT,
-        mobile TEXT,
-        securityQuestion TEXT,
-        securityAnswer TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        isOnline INTEGER DEFAULT 0
-      );
-
-      CREATE TABLE IF NOT EXISTS site_stats (
-        id INTEGER PRIMARY KEY,
-        total_visitors INTEGER DEFAULT 0
-      );
-
-      CREATE TABLE IF NOT EXISTS cvs (
-        userId TEXT PRIMARY KEY,
-        data TEXT NOT NULL,
-        FOREIGN KEY (userId) REFERENCES users(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS saved_jobs (
-        userId TEXT,
-        jobId TEXT,
-        savedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (userId, jobId),
-        FOREIGN KEY (userId) REFERENCES users(id),
-        FOREIGN KEY (jobId) REFERENCES jobs(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS orders (
-        id TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        jobId TEXT NOT NULL,
-        selectedPost TEXT,
-        transactionId TEXT,
-        paymentMethod TEXT,
-        status TEXT NOT NULL DEFAULT 'Ordered',
-        statusHistory TEXT,
-        amount TEXT NOT NULL,
-        jobFee TEXT,
-        serviceCharge TEXT,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        demoCopyUrl TEXT,
-        finalCopyUrl TEXT,
-        adminNote TEXT,
-        FOREIGN KEY (userId) REFERENCES users(id),
-        FOREIGN KEY (jobId) REFERENCES jobs(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS site_settings (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS comments (
-        id TEXT PRIMARY KEY,
-        jobId TEXT NOT NULL,
-        userId TEXT NOT NULL,
-        userName TEXT NOT NULL,
-        text TEXT NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (jobId) REFERENCES jobs(id),
-        FOREIGN KEY (userId) REFERENCES users(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS replies (
-        id TEXT PRIMARY KEY,
-        commentId TEXT NOT NULL,
-        userId TEXT NOT NULL,
-        userName TEXT NOT NULL,
-        text TEXT NOT NULL,
-        isAdmin INTEGER DEFAULT 0,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (commentId) REFERENCES comments(id),
-        FOREIGN KEY (userId) REFERENCES users(id)
-      );
-
-      CREATE TABLE IF NOT EXISTS contact_messages (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL,
-        subject TEXT NOT NULL,
-        message TEXT NOT NULL,
-        status TEXT DEFAULT 'new',
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-
-      CREATE TABLE IF NOT EXISTS service_requests (
-        id TEXT PRIMARY KEY,
-        userId TEXT NOT NULL,
-        type TEXT NOT NULL,
-        photoUrl TEXT,
-        signatureUrl TEXT,
-        processedPhotoUrl TEXT,
-        processedSignatureUrl TEXT,
-        transactionId TEXT NOT NULL,
-        paymentMethod TEXT,
-        status TEXT NOT NULL DEFAULT 'Pending',
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (userId) REFERENCES users(id)
-      );
-
-      INSERT OR IGNORE INTO site_stats (id, total_visitors) VALUES (1, 0);
-      
-      -- Default Settings
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('siteName', 'চাকরি সেবা');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('primaryColor', '#059669');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('contactPhone', '01700000000');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('contactEmail', 'info@chakriseba.com');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('noticeText', 'আমাদের সাইটে আপনাকে স্বাগতম! চাকরি সেবা - আপনার ক্যারিয়ারের বিশ্বস্ত সঙ্গী।');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('bkashNumber', '01700000000');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('nagadNumber', '01700000000');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('applicationFee', '১০০');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('heroTitle', 'আপনার স্বপ্নের চাকরি খুঁজুন');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('heroSubtitle', 'বাংলাদেশের সবচেয়ে বিশ্বস্ত চাকরি সেবা প্ল্যাটফর্ম');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('footerText', '© 2026 চাকরি সেবা। সর্বস্বত্ব সংরক্ষিত।');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('facebookLink', '');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('youtubeLink', '');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('logoUrl', '');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('aboutText', 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('contactAddress', 'ঢাকা, বাংলাদেশ');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('paymentInstructions', 'নিচের যেকোনো নাম্বারে সেন্ড মানি করে Transaction ID (TrxID) দিন।');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('seoTitle', 'চাকরি সেবা - বাংলাদেশের ১ নম্বর চাকরির পোর্টাল | Chakri Seba');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('seoDescription', 'সরকারি ও বেসরকারি চাকরির সবশেষ সার্কুলার ও ঘরে বসে সহজে আবেদনের বিশ্বস্ত মাধ্যম।');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('serviceCharge', '50');
-      INSERT OR IGNORE INTO site_settings (key, value) VALUES ('whatsappNumber', '01700000000');
-
-      -- Force update existing settings to ensure the change is visible immediately
-      UPDATE site_settings SET value = 'চাকরি সেবা' WHERE key = 'siteName';
-      UPDATE site_settings SET value = 'বাংলাদেশের সবচেয়ে বিশ্বস্ত চাকরি সেবা প্ল্যাটফর্ম' WHERE key = 'heroSubtitle';
-      UPDATE site_settings SET value = 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।' WHERE key = 'aboutText';
-      UPDATE site_settings SET value = 'চাকরি সেবা - বাংলাদেশের ১ নম্বর চাকরির পোর্টাল | Chakri Seba' WHERE key = 'seoTitle';
-      UPDATE site_settings SET value = 'সরকারি ও বেসরকারি চাকরির সবশেষ সার্কুলার ও ঘরে বসে সহজে আবেদনের বিশ্বস্ত মাধ্যম।' WHERE key = 'seoDescription';
-    `);
-    console.log("Database tables initialized.");
-  } catch (err) {
-    console.error("Failed to initialize database tables:", err);
-  }
-
-  // Migration for existing tables if columns are missing
-  const addColumn = (table: string, col: string, type: string = "TEXT") => {
-    try {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
-    } catch (e) {
-      // Column might already exist
-    }
-  };
-
-  // Jobs table migrations
-  ['companyLogoUrl', 'circularImageUrl', 'positions', 'applicationFee', 'searchKeywords', 'seoTitle', 'seoDescription'].forEach(col => addColumn("jobs", col));
-  addColumn("jobs", "createdAt", "DATETIME");
-  addColumn("jobs", "minEducationLevel", "INTEGER DEFAULT 0");
-  
-  try { db.exec("UPDATE jobs SET createdAt = CURRENT_TIMESTAMP WHERE createdAt IS NULL"); } catch (e) {}
-  
-  // Orders table migrations
-  ['statusHistory', 'selectedPost', 'demoCopyUrl', 'finalCopyUrl', 'adminNote', 'paymentMethod', 'jobFee', 'serviceCharge'].forEach(col => addColumn("orders", col));
-
-  // Users table migrations
-  ['fullName', 'email', 'mobile', 'securityQuestion', 'securityAnswer'].forEach(col => addColumn("users", col));
-  addColumn("users", "createdAt", "DATETIME");
-  addColumn("users", "isOnline", "INTEGER DEFAULT 0");
-
-  try { db.exec("UPDATE users SET createdAt = CURRENT_TIMESTAMP WHERE createdAt IS NULL"); } catch (e) {}
-
-  // Ensure admin exists
-  try {
-    const adminExists = db.prepare("SELECT * FROM users WHERE role = 'admin'").get();
-    if (!adminExists) {
-      db.prepare("INSERT INTO users (id, username, password, role, fullName, mobile) VALUES (?, ?, ?, ?, ?, ?)").run(
-        Math.random().toString(36).substr(2, 9),
-        'admin',
-        'admin123',
-        'admin',
-        'System Admin',
-        '01700000000'
-      );
-    } else {
-      // Force reset admin password to admin123 and username to admin in case it was changed and forgotten
-      db.prepare("UPDATE users SET password = 'admin123', username = 'admin' WHERE role = 'admin'").run();
-    }
-    console.log("Admin user verified and credentials reset to admin/admin123.");
-  } catch (err) {
-    console.error("Failed to verify admin user:", err);
-  }
+  console.log("🚀 Starting Chakri_Seba server with Supabase + SQLite Hybrid DB connection...");
 
   const app = express();
   const server = createServer(app);
   const wss = new WebSocketServer({ server });
   const PORT = 3000;
 
-  // Track active visitors
+  // Track active visitors & online users
   let activeVisitors = 0;
   const onlineUsers = new Map<string, WebSocket>();
 
@@ -277,7 +53,7 @@ async function startServer() {
         if (data.type === "AUTH" && data.userId) {
           currentUserId = data.userId;
           onlineUsers.set(currentUserId, ws);
-          db.prepare("UPDATE users SET isOnline = 1 WHERE id = ?").run(currentUserId);
+          dbClient.updateOnlineStatus(currentUserId, 1).then();
         }
       } catch (e) {}
     });
@@ -286,15 +62,15 @@ async function startServer() {
       activeVisitors--;
       if (currentUserId) {
         onlineUsers.delete(currentUserId);
-        db.prepare("UPDATE users SET isOnline = 0 WHERE id = ?").run(currentUserId);
+        dbClient.updateOnlineStatus(currentUserId, 0).then();
       }
     });
   });
 
-  // Increment total visitors
+  // Increment total visitors page views
   app.use((req, res, next) => {
     if (req.path === "/" || req.path === "/index.html") {
-      db.prepare("UPDATE site_stats SET total_visitors = total_visitors + 1 WHERE id = 1").run();
+      dbClient.incrementPageViews().catch(console.error);
     }
     next();
   });
@@ -318,67 +94,74 @@ async function startServer() {
   });
 
   // Auth Routes
-  app.get("/api/users", (req, res) => {
+  app.get("/api/users", async (req, res) => {
     try {
-      const users = db.prepare("SELECT id, username, password, role, fullName, email, mobile, createdAt, isOnline FROM users").all();
-      console.log(`Fetched ${users.length} users with all columns`);
+      const users = await dbClient.getUsers();
       res.json(users);
     } catch (error) {
-      console.error("Error fetching users with all columns:", error);
-      // Fallback to basic columns if new ones fail
-      try {
-        const users = db.prepare("SELECT id, username, password, role, fullName, email, mobile FROM users").all();
-        console.log(`Fetched ${users.length} users with basic columns`);
-        res.json(users);
-      } catch (innerError) {
-        console.error("Error fetching users with basic columns:", innerError);
-        res.status(500).json({ error: "ইউজার লিস্ট লোড করা সম্ভব হয়নি" });
-      }
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "ইউজার লিস্ট লোড করা সম্ভব হয়নি" });
     }
   });
 
-  app.get("/api/admin/stats", (req, res) => {
-    const stats = db.prepare("SELECT total_visitors FROM site_stats WHERE id = 1").get() as any;
-    const registeredUsers = db.prepare("SELECT COUNT(*) as count FROM users").get() as any;
-    const loggedInUsers = db.prepare("SELECT COUNT(*) as count FROM users WHERE isOnline = 1").get() as any;
-    const newMessages = db.prepare("SELECT COUNT(*) as count FROM contact_messages WHERE status = 'new'").get() as any;
-    
-    res.json({
-      totalVisitors: stats?.total_visitors || 0,
-      activeVisitors,
-      registeredUsers: registeredUsers?.count || 0,
-      loggedInUsers: loggedInUsers?.count || 0,
-      newMessages: newMessages?.count || 0
-    });
+  app.get("/api/admin/stats", async (req, res) => {
+    try {
+      const messages = await dbClient.getContactMessages();
+      const newMessagesCount = messages ? messages.filter((m: any) => m.status === 'new').length : 0;
+      const stats = await dbClient.getAdminStats(activeVisitors, newMessagesCount);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting admin stats:", error);
+      res.status(500).json({ error: "Failed to retrieve stats" });
+    }
   });
 
-  app.put("/api/users/:id/password", (req, res) => {
+  app.put("/api/users/:id/password", async (req, res) => {
     const { id } = req.params;
     const { password } = req.body;
     if (!password) return res.status(400).json({ error: "পাসওয়ার্ড দিন" });
     try {
-      db.prepare("UPDATE users SET password = ? WHERE id = ?").run(password, id);
+      await dbClient.updateUserPassword(id, password);
       res.json({ message: "পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে" });
     } catch (error) {
+      console.error("Error changing password:", error);
       res.status(500).json({ error: "পাসওয়ার্ড পরিবর্তন করা সম্ভব হয়নি" });
     }
   });
 
-  app.delete("/api/users/:id", (req, res) => {
+  app.put("/api/users/:id", async (req, res) => {
+    const { id } = req.params;
+    const { fullName, mobile, role, password } = req.body;
+    try {
+      if (mobile && !/^01\d{9}$/.test(mobile)) {
+        return res.status(400).json({ error: "আপনার ১১ ডিজিটের মোবাইল নাম্বারটির শুরুতে 01 লিখুন" });
+      }
+      await dbClient.updateUser(id, { fullName, mobile, role, password });
+      res.json({ message: "ইউজার সফলভাবে আপডেট করা হয়েছে" });
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "ইউজার আপডেট করা সম্ভব হয়নি" });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      const result = db.prepare("DELETE FROM users WHERE id = ? AND role != 'admin'").run(id);
-      if (result.changes > 0) {
-        res.json({ message: "ইউজার সফলভাবে ডিলিট করা হয়েছে" });
-      } else {
-        res.status(404).json({ error: "ইউজার পাওয়া যায়নি অথবা আপনি এডমিন ডিলিট করতে পারবেন না" });
+      const users = await dbClient.getUsers();
+      const user = users.find((u: any) => u.id === id);
+      if (user?.role === 'admin') {
+        return res.status(400).json({ error: "আপনি এডমিন ডিলিট করতে পারবেন না" });
       }
+
+      await dbClient.deleteUser(id);
+      res.json({ message: "ইউজার সফলভাবে ডিলিট করা হয়েছে" });
     } catch (error) {
+      console.error("Error deleting user:", error);
       res.status(500).json({ error: "ইউজার ডিলিট করা সম্ভব হয়নি" });
     }
   });
 
-  app.post("/api/register", (req, res) => {
+  app.post("/api/register", async (req, res) => {
     const { username, password, fullName, email, mobile, securityQuestion, securityAnswer } = req.body;
     
     // Validation
@@ -390,205 +173,205 @@ async function startServer() {
       return res.status(400).json({ error: "আপনার ১১ ডিজিটের মোবাইল নাম্বারটির শুরুতে 01 লিখুন" });
     }
 
-    const id = Math.random().toString(36).substr(2, 9);
     try {
-      // Check if mobile already exists
-      const existingMobile = db.prepare("SELECT * FROM users WHERE mobile = ?").get(mobile);
-      if (existingMobile) {
-        return res.status(400).json({ error: "এই মোবাইল নাম্বারটি দিয়ে ইতিমধ্যে রেজিস্ট্রেশন করা হয়েছে। দয়া করে লগইন করুন অথবা পাসওয়ার্ড ভুলে গেলে ফরগ্যাট অপশন ব্যবহার করুন।" });
-      }
-
-      db.prepare("INSERT INTO users (id, username, password, role, fullName, email, mobile, securityQuestion, securityAnswer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
-        id, username, password, 'user', fullName, email || null, mobile, securityQuestion, securityAnswer
-      );
-      res.status(201).json({ id, username, role: 'user', fullName, email, mobile });
+      const newUser = await dbClient.registerUser({
+        username, password, fullName, email, mobile, securityQuestion, securityAnswer
+      });
+      res.status(201).json(newUser);
     } catch (error: any) {
-      if (error.code === 'SQLITE_CONSTRAINT') {
-        res.status(400).json({ error: "ইউজারনেমটি ইতিমধ্যে ব্যবহৃত হয়েছে" });
-      } else {
-        res.status(500).json({ error: "রেজিস্ট্রেশন ব্যর্থ হয়েছে" });
-      }
+      console.error("Registration error:", error);
+      res.status(400).json({ error: error.message || "রেজিস্ট্রেশন ব্যর্থ হয়েছে" });
     }
   });
 
-  app.post("/api/forgot-password", (req, res) => {
+  app.post("/api/forgot-password", async (req, res) => {
     const { mobile } = req.body;
     if (!mobile) return res.status(400).json({ error: "মোবাইল নাম্বার দিন" });
     
-    const user = db.prepare("SELECT securityQuestion FROM users WHERE mobile = ?").get(mobile) as any;
-    if (user) {
-      res.json({ question: user.securityQuestion });
-    } else {
-      res.status(404).json({ error: "এই মোবাইল নাম্বারটি আমাদের সিস্টেমে পাওয়া যায়নি।" });
+    try {
+      const question = await dbClient.checkMobileSecurityQuestion(mobile);
+      if (question) {
+        res.json({ question });
+      } else {
+        res.status(404).json({ error: "এই মোবাইল নাম্বারটি আমাদের সিস্টেমে পাওয়া যায়নি।" });
+      }
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "সার্ভারে সমস্যা হয়েছে।" });
     }
   });
 
-  app.post("/api/verify-security-answer", (req, res) => {
+  app.post("/api/verify-security-answer", async (req, res) => {
     const { mobile, answer } = req.body;
     if (!mobile || !answer) return res.status(400).json({ error: "সবগুলো তথ্য দিন" });
 
-    const user = db.prepare("SELECT username, password FROM users WHERE mobile = ? AND LOWER(securityAnswer) = LOWER(?)").get(mobile, answer) as any;
-    if (user) {
-      res.json({ 
-        username: user.username, 
-        password: user.password,
-        message: "আপনার তথ্য নিচে দেওয়া হলো। দয়া করে এটি লিখে রাখুন।" 
-      });
-    } else {
-      res.status(400).json({ error: "ভুল উত্তর! দয়া করে সঠিক উত্তর দিন।" });
+    try {
+      const user = await dbClient.verifySecurityAnswer(mobile, answer);
+      if (user) {
+        res.json({ 
+          username: user.username, 
+          password: user.password,
+          message: "আপনার তথ্য নিচে দেওয়া হলো। দয়া করে এটি লিখে রাখুন।" 
+        });
+      } else {
+        res.status(400).json({ error: "ভুল উত্তর! দয়া করে সঠিক উত্তর দিন।" });
+      }
+    } catch (error) {
+      console.error("Verify answer error:", error);
+      res.status(500).json({ error: "সার্ভার এরর" });
     }
   });
 
-  app.post("/api/login", (req, res) => {
+  app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
-    const user = db.prepare("SELECT * FROM users WHERE LOWER(username) = LOWER(?) AND password = ?").get(username, password) as any;
-    if (user) {
-      res.json({ 
-        id: user.id, 
-        username: user.username, 
-        role: user.role,
-        fullName: user.fullName,
-        email: user.email,
-        mobile: user.mobile
-      });
-    } else {
+    try {
+      const user = await dbClient.login(username, password);
+      if (user) {
+        res.json({ 
+          id: user.id, 
+          username: user.username, 
+          role: user.role,
+          fullName: user.fullName,
+          email: user.email,
+          mobile: user.mobile
+        });
+      } else {
+        res.status(401).json({ error: "ভুল ইউজারনেম বা পাসওয়ার্ড!" });
+      }
+    } catch (error) {
+      console.error("Login route error:", error);
       res.status(401).json({ error: "ভুল ইউজারনেম বা পাসওয়ার্ড!" });
     }
   });
 
-  // API Routes
-  app.get("/api/jobs", (req, res) => {
-    const jobs = db.prepare("SELECT * FROM jobs ORDER BY createdAt DESC").all();
-    res.json(jobs.map((j: any) => ({ 
-      ...j, 
-      requirements: JSON.parse(j.requirements),
-      positions: j.positions ? JSON.parse(j.positions) : [],
-      searchKeywords: j.searchKeywords || '',
-      seoTitle: j.seoTitle || '',
-      seoDescription: j.seoDescription || ''
-    })));
+  // Jobs Routes
+  app.get("/api/jobs", async (req, res) => {
+    try {
+      const jobs = await dbClient.getJobs();
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+      res.status(500).json({ error: "Failed to load jobs" });
+    }
   });
 
-  app.post("/api/jobs", (req, res) => {
-    const { title, company, category, location, deadline, description, requirements, salary, companyLogoUrl, circularImageUrl, positions, applicationFee, searchKeywords, seoTitle, seoDescription } = req.body;
-    const id = Math.random().toString(36).substr(2, 9);
+  app.post("/api/jobs", async (req, res) => {
     try {
-      db.prepare(`
-        INSERT INTO jobs (id, title, company, category, location, deadline, description, requirements, salary, companyLogoUrl, circularImageUrl, positions, applicationFee, searchKeywords, seoTitle, seoDescription)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, title, company, category, location, deadline, description, JSON.stringify(requirements), salary, companyLogoUrl, circularImageUrl, JSON.stringify(positions || []), applicationFee, searchKeywords || '', seoTitle || '', seoDescription || '');
-      res.status(201).json({ id, title, company, category, location, deadline, description, requirements, salary, companyLogoUrl, circularImageUrl, positions, applicationFee, searchKeywords, seoTitle, seoDescription });
+      const newJob = await dbClient.createJob(req.body);
+      res.status(201).json(newJob);
     } catch (error) {
+      console.error("Error creating job:", error);
       res.status(500).json({ error: "Failed to create job" });
     }
   });
 
-  app.put("/api/jobs/:id", (req, res) => {
+  app.put("/api/jobs/:id", async (req, res) => {
     const { id } = req.params;
-    const { title, company, category, location, deadline, description, requirements, salary, companyLogoUrl, circularImageUrl, positions, applicationFee, searchKeywords, seoTitle, seoDescription } = req.body;
     try {
-      db.prepare(`
-        UPDATE jobs 
-        SET title = ?, company = ?, category = ?, location = ?, deadline = ?, description = ?, requirements = ?, salary = ?, companyLogoUrl = ?, circularImageUrl = ?, positions = ?, applicationFee = ?, searchKeywords = ?, seoTitle = ?, seoDescription = ?
-        WHERE id = ?
-      `).run(title, company, category, location, deadline, description, JSON.stringify(requirements), salary, companyLogoUrl, circularImageUrl, JSON.stringify(positions || []), applicationFee, searchKeywords || '', seoTitle || '', seoDescription || '', id);
-      res.json({ id, title, company, category, location, deadline, description, requirements, salary, companyLogoUrl, circularImageUrl, positions, applicationFee, searchKeywords, seoTitle, seoDescription });
+      const updatedJob = await dbClient.updateJob(id, req.body);
+      res.json(updatedJob);
     } catch (error) {
+      console.error("Error updating job:", error);
       res.status(500).json({ error: "Failed to update job" });
     }
   });
 
-  app.delete("/api/jobs/:id", (req, res) => {
+  app.delete("/api/jobs/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare("DELETE FROM jobs WHERE id = ?").run(id);
+      await dbClient.deleteJob(id);
       res.status(204).send();
     } catch (error) {
+      console.error("Error deleting job:", error);
       res.status(500).json({ error: "Failed to delete job" });
     }
   });
 
-  app.get("/api/stats", (req, res) => {
-    const total = db.prepare("SELECT COUNT(*) as count FROM jobs").get() as any;
-    const byCategory = db.prepare("SELECT category, COUNT(*) as count FROM jobs GROUP BY category").all();
-    res.json({ total: total.count, byCategory });
+  app.get("/api/stats", async (req, res) => {
+    try {
+      const stats = await dbClient.getJobStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching job stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
   });
 
   // Saved Jobs Routes
-  app.get("/api/users/:userId/saved-jobs", (req, res) => {
+  app.get("/api/users/:userId/saved-jobs", async (req, res) => {
     const { userId } = req.params;
     try {
-      const savedJobs = db.prepare(`
-        SELECT jobs.*, saved_jobs.savedAt 
-        FROM jobs 
-        JOIN saved_jobs ON jobs.id = saved_jobs.jobId 
-        WHERE saved_jobs.userId = ?
-      `).all(userId);
-      res.json(savedJobs.map((j: any) => ({ ...j, requirements: JSON.parse(j.requirements) })));
+      const list = await dbClient.getSavedJobs(userId);
+      res.json(list);
     } catch (error) {
+      console.error("Error getting saved jobs:", error);
       res.status(500).json({ error: "Failed to fetch saved jobs" });
     }
   });
 
-  app.post("/api/users/:userId/saved-jobs", (req, res) => {
+  app.post("/api/users/:userId/saved-jobs", async (req, res) => {
     const { userId } = req.params;
     const { jobId } = req.body;
     try {
-      db.prepare("INSERT OR IGNORE INTO saved_jobs (userId, jobId) VALUES (?, ?)").run(userId, jobId);
+      await dbClient.saveJob(userId, jobId);
       res.json({ message: "Job saved successfully" });
     } catch (error) {
+      console.error("Error saving job:", error);
       res.status(500).json({ error: "Failed to save job" });
     }
   });
 
-  app.delete("/api/users/:userId/saved-jobs/:jobId", (req, res) => {
+  app.delete("/api/users/:userId/saved-jobs/:jobId", async (req, res) => {
     const { userId, jobId } = req.params;
     try {
-      db.prepare("DELETE FROM saved_jobs WHERE userId = ? AND jobId = ?").run(userId, jobId);
+      await dbClient.unsaveJob(userId, jobId);
       res.status(204).send();
     } catch (error) {
+      console.error("Error removing saved job:", error);
       res.status(500).json({ error: "Failed to unsave job" });
     }
   });
 
   // CV Routes
-  app.get("/api/cv/:userId", (req, res) => {
+  app.get("/api/cv/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const cv = db.prepare("SELECT data FROM cvs WHERE userId = ?").get(userId) as any;
+      const cv = await dbClient.getCV(userId);
       if (cv) {
-        res.json(JSON.parse(cv.data));
+        res.json(cv);
       } else {
         res.status(404).json({ error: "CV not found" });
       }
     } catch (error) {
+      console.error("Error getting CV:", error);
       res.status(500).json({ error: "Failed to fetch CV" });
     }
   });
 
-  app.post("/api/cv/:userId", (req, res) => {
+  app.post("/api/cv/:userId", async (req, res) => {
     const { userId } = req.params;
-    const data = req.body;
     try {
-      db.prepare("INSERT OR REPLACE INTO cvs (userId, data) VALUES (?, ?)").run(userId, JSON.stringify(data));
+      await dbClient.saveCV(userId, req.body);
       res.json({ message: "CV saved successfully" });
     } catch (error) {
+      console.error("Error saving CV:", error);
       res.status(500).json({ error: "Failed to save CV" });
     }
   });
 
-  app.get("/api/admin/cv/:userId/download", (req, res) => {
+  app.get("/api/admin/cv/:userId/download", async (req, res) => {
     const { userId } = req.params;
     try {
-      const cv = db.prepare("SELECT data FROM cvs WHERE userId = ?").get(userId) as any;
+      const cv = await dbClient.getCV(userId);
       if (cv) {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Content-Disposition', `attachment; filename=cv_${userId}.json`);
-        res.send(cv.data);
+        res.send(JSON.stringify(cv));
       } else {
         res.status(404).json({ error: "CV not found" });
       }
     } catch (error) {
+      console.error("Error downloading CV:", error);
       res.status(500).json({ error: "Failed to fetch CV" });
     }
   });
@@ -597,46 +380,41 @@ async function startServer() {
   app.post("/api/service-requests", upload.fields([
     { name: 'photo', maxCount: 1 },
     { name: 'signature', maxCount: 1 }
-  ]), (req, res) => {
+  ]), async (req, res) => {
     const { userId, type, transactionId, paymentMethod } = req.body;
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     
-    const id = Math.random().toString(36).substr(2, 9);
-    const photoUrl = files['photo'] ? `/uploads/${files['photo'][0].filename}` : null;
-    const signatureUrl = files['signature'] ? `/uploads/${files['signature'][0].filename}` : null;
+    const photoUrl = (files && files['photo']) ? `/uploads/${files['photo'][0].filename}` : null;
+    const signatureUrl = (files && files['signature']) ? `/uploads/${files['signature'][0].filename}` : null;
 
     try {
-      db.prepare(`
-        INSERT INTO service_requests (id, userId, type, photoUrl, signatureUrl, transactionId, paymentMethod)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(id, userId, type, photoUrl, signatureUrl, transactionId, paymentMethod);
-      res.status(201).json({ id, status: 'Pending' });
+      const request = await dbClient.createServiceRequest({
+        userId, type, photoUrl, signatureUrl, transactionId, paymentMethod
+      });
+      res.status(201).json(request);
     } catch (error) {
       console.error("Failed to create service request:", error);
       res.status(500).json({ error: "Failed to submit request" });
     }
   });
 
-  app.get("/api/service-requests", (req, res) => {
+  app.get("/api/service-requests", async (req, res) => {
     try {
-      const requests = db.prepare(`
-        SELECT sr.*, u.fullName, u.mobile 
-        FROM service_requests sr
-        JOIN users u ON sr.userId = u.id
-        ORDER BY sr.createdAt DESC
-      `).all();
+      const requests = await dbClient.getServiceRequests();
       res.json(requests);
     } catch (error) {
+      console.error("Failed to fetch service requests:", error);
       res.status(500).json({ error: "Failed to fetch service requests" });
     }
   });
 
-  app.get("/api/my-service-requests/:userId", (req, res) => {
+  app.get("/api/my-service-requests/:userId", async (req, res) => {
     const { userId } = req.params;
     try {
-      const requests = db.prepare("SELECT * FROM service_requests WHERE userId = ? ORDER BY createdAt DESC").all(userId);
+      const requests = await dbClient.getUserServiceRequests(userId);
       res.json(requests);
     } catch (error) {
+      console.error("Error fetching user's service requests:", error);
       res.status(500).json({ error: "Failed to fetch your requests" });
     }
   });
@@ -644,82 +422,63 @@ async function startServer() {
   app.put("/api/service-requests/:id", upload.fields([
     { name: 'processedPhoto', maxCount: 1 },
     { name: 'processedSignature', maxCount: 1 }
-  ]), (req, res) => {
+  ]), async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     
     try {
-      let query = "UPDATE service_requests SET status = ?";
-      const params: any[] = [status];
+      const updates: any = { status };
 
-      if (files['processedPhoto']) {
-        query += ", processedPhotoUrl = ?";
-        params.push(`/uploads/${files['processedPhoto'][0].filename}`);
+      if (files && files['processedPhoto']) {
+        updates.processedPhotoUrl = `/uploads/${files['processedPhoto'][0].filename}`;
       }
-      if (files['processedSignature']) {
-        query += ", processedSignatureUrl = ?";
-        params.push(`/uploads/${files['processedSignature'][0].filename}`);
+      if (files && files['processedSignature']) {
+        updates.processedSignatureUrl = `/uploads/${files['processedSignature'][0].filename}`;
       }
 
-      query += " WHERE id = ?";
-      params.push(id);
-
-      db.prepare(query).run(...params);
+      await dbClient.updateServiceRequest(id, updates);
       res.json({ message: "Request updated successfully" });
     } catch (error) {
+      console.error("Error updating service request:", error);
       res.status(500).json({ error: "Failed to update request" });
     }
   });
 
   // Orders Routes
-  app.get("/api/orders", (req, res) => {
+  app.get("/api/orders", async (req, res) => {
     try {
-      const orders = db.prepare(`
-        SELECT o.*, j.title as jobTitle, j.company, u.username as userName, u.mobile as userMobile
-        FROM orders o
-        JOIN jobs j ON o.jobId = j.id
-        JOIN users u ON o.userId = u.id
-        ORDER BY o.createdAt DESC
-      `).all() as any[];
-      res.json(orders.map(o => ({
-        ...o,
-        statusHistory: o.statusHistory ? JSON.parse(o.statusHistory) : []
-      })));
+      const orders = await dbClient.getOrders();
+      res.json(orders);
     } catch (error) {
+      console.error("Error fetching orders:", error);
       res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
 
-  app.get("/api/users/:userId/orders", (req, res) => {
+  app.get("/api/users/:userId/orders", async (req, res) => {
     const { userId } = req.params;
     try {
-      const orders = db.prepare(`
-        SELECT o.*, j.title as jobTitle, j.company
-        FROM orders o
-        JOIN jobs j ON o.jobId = j.id
-        WHERE o.userId = ?
-        ORDER BY o.createdAt DESC
-      `).all(userId) as any[];
-      res.json(orders.map(o => ({
-        ...o,
-        statusHistory: o.statusHistory ? JSON.parse(o.statusHistory) : []
-      })));
+      const orders = await dbClient.getUserOrders(userId);
+      res.json(orders);
     } catch (error) {
+      console.error("Failed to fetch user orders:", error);
       res.status(500).json({ error: "Failed to fetch user orders" });
     }
   });
 
-  app.post("/api/orders", (req, res) => {
+  app.post("/api/orders", async (req, res) => {
     const { id, userId, jobId, selectedPost, amount, jobFee, serviceCharge } = req.body;
 
     try {
-      // 1. Get Job details for education requirement
-      const job = db.prepare("SELECT title, minEducationLevel FROM jobs WHERE id = ?").get(jobId) as any;
-      if (!job) return res.status(404).json({ error: "Job not found" });
+      // 1. Get Job details for educational check
+      const job = await dbClient.getJobMinEducationLevel(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
 
       // 2. Fetch User's CV
-      const cvRow = db.prepare("SELECT data FROM cvs WHERE userId = ?").get(userId) as any;
+      const cvData = await dbClient.getCV(userId);
       
       const eduMapping: { [key: string]: number } = {
         'SSC/Equivalent Level': 1,
@@ -736,16 +495,13 @@ async function startServer() {
       };
 
       if (job.minEducationLevel > 0) {
-        if (!cvRow) {
+        if (!cvData) {
           return res.status(400).json({ 
             error: `দুঃখিত, এই পদে আবেদন করতে হলে আপনার সিভিতে কমপক্ষে "${levelLabels[job.minEducationLevel]}" যুক্ত থাকতে হবে। অনুগ্রহ করে আগে আপনার সিভি তৈরি করুন।` 
           });
         }
 
-        const cvData = JSON.parse(cvRow.data);
         const userEdu = cvData.education || [];
-        
-        // Find user's highest education level
         let userMaxLevel = 0;
         userEdu.forEach((edu: any) => {
           const levelVal = eduMapping[edu.level] || 0;
@@ -755,7 +511,8 @@ async function startServer() {
         });
 
         if (userMaxLevel < job.minEducationLevel) {
-          const user = db.prepare("SELECT fullName FROM users WHERE id = ?").get(userId) as any;
+          const users = await dbClient.getUsers();
+          const user = users.find((u: any) => u.id === userId);
           return res.status(400).json({ 
             error: `প্রিয় ${user?.fullName || 'ইউজার'}, আপনার সিভিতে এই পদের জন্য প্রয়োজনীয় ন্যূনতম শিক্ষাগত যোগ্যতা ("${levelLabels[job.minEducationLevel]}") যুক্ত করা নেই। যদি আপনার এই শিক্ষাগত যোগ্যতা থাকে, তবে দয়া করে আপনার ড্যাশবোর্ড থেকে সিভি আপডেট করে পুনরায় আবেদনের চেষ্টা করুন।` 
           });
@@ -763,28 +520,33 @@ async function startServer() {
       }
 
       // Check for duplicate order
-      const existingOrder = db.prepare(`
-        SELECT id FROM orders 
-        WHERE userId = ? AND jobId = ? AND (selectedPost = ? OR (selectedPost IS NULL AND ? IS NULL))
-      `).get(userId, jobId, selectedPost || null, selectedPost || null);
-
+      const existingOrder = await dbClient.checkDuplicateOrder(userId, jobId);
       if (existingOrder) {
-        const user = db.prepare("SELECT fullName FROM users WHERE id = ?").get(userId) as any;
+        const users = await dbClient.getUsers();
+        const user = users.find((u: any) => u.id === userId);
         return res.status(400).json({ 
           error: `প্রিয় ${user?.fullName || 'ইউজার'}, আপনি ইতোমধ্যে এই চাকরির উক্ত পদে আবেদনের জন্য অর্ডার করেছেন। অনুগ্রহ করে আপনার ড্যাশবোর্ড চেক করুন অথবা অন্য পদে আবেদনের জন্য অর্ডার করুন` 
         });
       }
 
-      const initialHistory = JSON.stringify([{
+      const initialHistory = [{
         status: 'Ordered',
         timestamp: new Date().toISOString(),
         note: 'অর্ডার গ্রহণ করা হয়েছে। আমরা শীঘ্রই আপনার হয়ে আবেদন শুরু করব।'
-      }]);
+      }];
       
-      db.prepare(`
-        INSERT INTO orders (id, userId, jobId, selectedPost, transactionId, paymentMethod, amount, jobFee, serviceCharge, status, statusHistory)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Ordered', ?)
-      `).run(id, userId, jobId, selectedPost || null, '', '', amount, jobFee || '0', serviceCharge || '0', initialHistory);
+      await dbClient.createOrder({
+        id, 
+        userId, 
+        jobId, 
+        selectedPost, 
+        amount, 
+        jobFee, 
+        serviceCharge, 
+        status: 'Ordered', 
+        statusHistory: initialHistory
+      });
+
       res.status(201).json({ message: "Order created successfully" });
     } catch (error) {
       console.error("Failed to create order:", error);
@@ -792,26 +554,24 @@ async function startServer() {
     }
   });
 
-  app.put("/api/orders/:orderId/payment", (req, res) => {
+  app.put("/api/orders/:orderId/payment", async (req, res) => {
     const { orderId } = req.params;
     const { transactionId, paymentMethod } = req.body;
     try {
-      const order = db.prepare("SELECT statusHistory FROM orders WHERE id = ?").get(orderId) as any;
-      if (!order) return res.status(404).json({ error: "Order not found" });
-      
-      const history = order.statusHistory ? JSON.parse(order.statusHistory) : [];
+      const history = await dbClient.getOrderHistory(orderId);
       history.push({
         status: 'Payment Sent',
         timestamp: new Date().toISOString(),
         note: `পেমেন্ট তথ্য জমাদিন করা হয়েছে (TrxID: ${transactionId}, Method: ${paymentMethod})`
       });
 
-      db.prepare(`
-        UPDATE orders 
-        SET transactionId = ?, paymentMethod = ?, status = ?, statusHistory = ? 
-        WHERE id = ?
-      `).run(transactionId, paymentMethod, 'Payment Sent', JSON.stringify(history), orderId);
-      
+      await dbClient.updateOrderFields(orderId, {
+        transactionId, 
+        paymentMethod, 
+        status: 'Payment Sent', 
+        statusHistory: history
+      });
+
       res.json({ message: "Payment info submitted successfully" });
     } catch (error) {
       console.error("Failed to update order payment:", error);
@@ -819,14 +579,11 @@ async function startServer() {
     }
   });
 
-  app.put("/api/orders/:orderId/status", (req, res) => {
+  app.put("/api/orders/:orderId/status", async (req, res) => {
     const { orderId } = req.params;
     const { status, note, demoCopyUrl, finalCopyUrl, adminNote } = req.body;
     try {
-      const order = db.prepare("SELECT statusHistory FROM orders WHERE id = ?").get(orderId) as any;
-      if (!order) return res.status(404).json({ error: "Order not found" });
-
-      const history = order.statusHistory ? JSON.parse(order.statusHistory) : [];
+      const history = await dbClient.getOrderHistory(orderId);
       
       const statusLabels: { [key: string]: string } = {
         'Ordered': 'অর্ডার করা হয়েছে',
@@ -842,26 +599,19 @@ async function startServer() {
         note: note || `${statusLabels[status] || status} অবস্থায় পরিবর্তন করা হয়েছে`
       });
 
-      let query = "UPDATE orders SET status = ?, statusHistory = ?";
-      const params: any[] = [status, JSON.stringify(history)];
+      const updates: any = { status, statusHistory: history };
 
       if (demoCopyUrl !== undefined) {
-        query += ", demoCopyUrl = ?";
-        params.push(demoCopyUrl);
+        updates.demoCopyUrl = demoCopyUrl;
       }
       if (finalCopyUrl !== undefined) {
-        query += ", finalCopyUrl = ?";
-        params.push(finalCopyUrl);
+        updates.finalCopyUrl = finalCopyUrl;
       }
       if (adminNote !== undefined) {
-        query += ", adminNote = ?";
-        params.push(adminNote);
+        updates.adminNote = adminNote;
       }
 
-      query += " WHERE id = ?";
-      params.push(orderId);
-
-      db.prepare(query).run(...params);
+      await dbClient.updateOrderFields(orderId, updates);
       res.json({ message: "Order status updated" });
     } catch (error) {
       console.error("Failed to update order status:", error);
@@ -869,120 +619,114 @@ async function startServer() {
     }
   });
 
-  app.get("/api/settings", (req, res) => {
+  app.get("/api/settings", async (req, res) => {
     try {
-      const settings = db.prepare("SELECT * FROM site_settings").all();
-      const settingsObj = settings.reduce((acc: any, curr: any) => {
-        acc[curr.key] = curr.value;
-        return acc;
-      }, {});
+      const settingsObj = await dbClient.getSettings();
       res.json(settingsObj);
     } catch (error) {
+      console.error("Error loading site settings:", error);
       res.status(500).json({ error: "Failed to fetch settings" });
     }
   });
 
-  app.put("/api/settings", (req, res) => {
-    const settings = req.body;
+  app.put("/api/settings", async (req, res) => {
     try {
-      const stmt = db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES (?, ?)");
-      const transaction = db.transaction((data) => {
-        for (const [key, value] of Object.entries(data)) {
-          stmt.run(key, String(value));
-        }
-      });
-      transaction(settings);
+      await dbClient.updateSettings(req.body);
       res.json({ message: "Settings updated successfully" });
     } catch (error) {
+      console.error("Error saving site settings:", error);
       res.status(500).json({ error: "Failed to update settings" });
     }
   });
 
   // Comments & Replies API
-  app.get("/api/jobs/:jobId/comments", (req, res) => {
+  app.get("/api/jobs/:jobId/comments", async (req, res) => {
     const { jobId } = req.params;
     try {
-      const comments = db.prepare("SELECT * FROM comments WHERE jobId = ? ORDER BY createdAt DESC").all(jobId) as any[];
-      const commentsWithReplies = comments.map(comment => {
-        const replies = db.prepare("SELECT * FROM replies WHERE commentId = ? ORDER BY createdAt ASC").all(comment.id) as any[];
-        return {
-          ...comment,
-          replies: replies.map(r => ({ ...r, isAdmin: Boolean(r.isAdmin) }))
-        };
-      });
-      res.json(commentsWithReplies);
+      const comments = await dbClient.getComments(jobId);
+      res.json(comments);
     } catch (error) {
+      console.error("Error loading comments:", error);
       res.status(500).json({ error: "Failed to fetch comments" });
     }
   });
 
-  app.post("/api/jobs/:jobId/comments", (req, res) => {
+  app.post("/api/jobs/:jobId/comments", async (req, res) => {
     const { jobId } = req.params;
     const { userId, userName, text } = req.body;
-    const id = Math.random().toString(36).substr(2, 9);
     try {
-      db.prepare("INSERT INTO comments (id, jobId, userId, userName, text) VALUES (?, ?, ?, ?, ?)").run(id, jobId, userId, userName, text);
-      res.status(201).json({ id, jobId, userId, userName, text, createdAt: new Date().toISOString(), replies: [] });
+      const newComment = await dbClient.createComment({
+        jobId, userId, userName, text
+      });
+      res.status(201).json(newComment);
     } catch (error) {
+      console.error("Error creating comment:", error);
       res.status(500).json({ error: "Failed to add comment" });
     }
   });
 
-  app.post("/api/comments/:commentId/replies", (req, res) => {
+  app.post("/api/comments/:commentId/replies", async (req, res) => {
     const { commentId } = req.params;
     const { userId, userName, text, isAdmin } = req.body;
-    const id = Math.random().toString(36).substr(2, 9);
     try {
-      db.prepare("INSERT INTO replies (id, commentId, userId, userName, text, isAdmin) VALUES (?, ?, ?, ?, ?, ?)").run(id, commentId, userId, userName, text, isAdmin ? 1 : 0);
-      res.status(201).json({ id, commentId, userId, userName, text, isAdmin, createdAt: new Date().toISOString() });
+      const newReply = await dbClient.createReply({
+        commentId, userId, userName, text, isAdmin
+      });
+      res.status(201).json(newReply);
     } catch (error) {
+      console.error("Error creating reply:", error);
       res.status(500).json({ error: "Failed to add reply" });
     }
   });
 
   // Contact Messages API
-  app.get("/api/contact", (req, res) => {
+  app.get("/api/contact", async (req, res) => {
     try {
-      const messages = db.prepare("SELECT * FROM contact_messages ORDER BY createdAt DESC").all();
+      const messages = await dbClient.getContactMessages();
       res.json(messages);
     } catch (error) {
+      console.error("Error loading contact messages:", error);
       res.status(500).json({ error: "Failed to fetch contact messages" });
     }
   });
 
-  app.post("/api/contact", (req, res) => {
+  app.post("/api/contact", async (req, res) => {
     const { name, email, subject, message } = req.body;
-    const id = Math.random().toString(36).substr(2, 9);
     try {
-      db.prepare("INSERT INTO contact_messages (id, name, email, subject, message) VALUES (?, ?, ?, ?, ?)").run(id, name, email, subject, message);
-      res.status(201).json({ id, name, email, subject, message, status: 'new', createdAt: new Date().toISOString() });
+      const newMsg = await dbClient.createContactMessage({
+        name, email, subject, message
+      });
+      res.status(201).json(newMsg);
     } catch (error) {
+      console.error("Error sending message:", error);
       res.status(500).json({ error: "Failed to send message" });
     }
   });
 
-  app.put("/api/contact/:id/status", (req, res) => {
+  app.put("/api/contact/:id/status", async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     try {
-      db.prepare("UPDATE contact_messages SET status = ? WHERE id = ?").run(status, id);
+      await dbClient.updateContactMessageStatus(id, status);
       res.json({ message: "Message status updated" });
     } catch (error) {
+      console.error("Error updating message status:", error);
       res.status(500).json({ error: "Failed to update message status" });
     }
   });
 
-  app.delete("/api/contact/:id", (req, res) => {
+  app.delete("/api/contact/:id", async (req, res) => {
     const { id } = req.params;
     try {
-      db.prepare("DELETE FROM contact_messages WHERE id = ?").run(id);
+      await dbClient.deleteContactMessage(id);
       res.status(204).send();
     } catch (error) {
+      console.error("Error deleting contact message:", error);
       res.status(500).json({ error: "Failed to delete message" });
     }
   });
 
-  // Vite middleware for development
+  // Vite middleware for development or Static Assets for Production
   if (process.env.NODE_ENV !== "production") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
