@@ -2244,6 +2244,17 @@ export default function App() {
     fetchSettings();
   }, []);
 
+  // Enforce login/registration gate for all preparation-related views (প্রস্তুতি পেজ গেট)
+  useEffect(() => {
+    const prepViews = ['subject-lessons', 'mock-test', 'ai-interview', 'skill-assessment'];
+    if (prepViews.includes(view) && !user) {
+      setView('user');
+      setAuthMode('login');
+      setIsLoginModalOpen(true);
+      showToast('প্রস্তুতি ও পড়াশোনা বিভাগে প্রবেশ করতে দয়া করে প্রথমে লগইন বা রেজিস্ট্রেশন করুন।', 'info');
+    }
+  }, [view, user]);
+
   useEffect(() => {
     if (siteSettings.primaryColor) {
       document.documentElement.style.setProperty('--primary-color', siteSettings.primaryColor);
@@ -4446,7 +4457,7 @@ export default function App() {
                     { id: 'ai-interview', label: 'AI ইন্টারভিউ' },
                     { id: 'skill-assessment', label: 'স্কিল অ্যাসেসমেন্ট' }
                   ].map((item) => (
-                    <button key={item.id} onClick={() => setView(item.id as any)} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all">{item.label}</button>
+                    <button key={item.id} onClick={() => handleProtectedView(item.id as any)} className="w-full text-left px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all">{item.label}</button>
                   ))}
                 </div>
               </div>
@@ -4855,7 +4866,7 @@ export default function App() {
                     ].map((item) => (
                       <button
                         key={item.id}
-                        onClick={() => { setView(item.id as any); setIsMobileMenuOpen(false); }}
+                        onClick={() => { handleProtectedView(item.id as any); }}
                         className="flex flex-col items-start gap-2.5 p-4 bg-white border border-gray-100 hover:border-emerald-300 rounded-2xl active:scale-95 transition-all text-left cursor-pointer group font-bengali"
                       >
                         <div className={`w-8 h-8 ${item.color} rounded-lg flex items-center justify-center`}>{item.icon}</div>

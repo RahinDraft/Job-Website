@@ -54,7 +54,7 @@ interface SubjectLessonsProps {
 
 export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToast }) => {
   // Navigation tabs state
-  const [activeTab, setActiveTab] = useState<'lecture' | 'question_bank' | 'flashcards' | 'mnemonics' | 'routine' | 'contribute'>('lecture');
+  const [activeTab, setActiveTab] = useState<'lecture' | 'ai_coach' | 'question_bank' | 'flashcards' | 'mnemonics' | 'routine' | 'contribute'>('lecture');
 
   // Dynamic Content States loaded from defaults + localStorage custom contributions
   const [subjectLessons, setSubjectLessons] = useState<Subject[]>(() => {
@@ -118,6 +118,24 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
   // Contribution Form states
   const [contributorRole, setContributorRole] = useState<'user' | 'admin'>('user');
   const [contributionType, setContributionType] = useState<'past_question' | 'lecture' | 'flashcard' | 'mnemonic'>('past_question');
+
+  // AI Coach states
+  const [aiTopicInput, setAiTopicInput] = useState<string>('');
+  const [isGeneratingAi, setIsGeneratingAi] = useState<boolean>(false);
+  const [aiGeneratedLesson, setAiGeneratedLesson] = useState<{
+    title: string;
+    importantTag: string;
+    content: string;
+    quickHack: string;
+    quiz: {
+      question: string;
+      options: string[];
+      answerIndex: number;
+      explanation: string;
+    };
+  } | null>(null);
+  const [selectedAiQuizAnswerIdx, setSelectedAiQuizAnswerIdx] = useState<number | null>(null);
+  const [saveToSubjectId, setSaveToSubjectId] = useState<string>('bangla');
 
   // Form inputs
   const [pqExamName, setPqExamName] = useState('');
@@ -314,6 +332,88 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
     localStorage.setItem('shadhin_completed_custom_goals', JSON.stringify(updated));
     if (updated[text]) {
       showToast('দারুণ! আপনার ব্যক্তিগত স্টাডি গোল অর্জিত হয়েছে। 🎯', 'success');
+    }
+  };
+
+  const handleGenerateAiLesson = async () => {
+    if (!aiTopicInput.trim()) {
+      showToast('অনুগ্রহ করে আগে অধ্যায় বা বিষয়ের নাম লিখুন!', 'error');
+      return;
+    }
+    setIsGeneratingAi(true);
+    setAiGeneratedLesson(null);
+    setSelectedAiQuizAnswerIdx(null);
+    try {
+      const response = await fetch('/api/ai/generate-lesson', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ topic: aiTopicInput.trim() })
+      });
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || 'Failed to generate content');
+      }
+      const data = await response.json();
+      setAiGeneratedLesson(data);
+      showToast('এআই শিক্ষক সফলভাবে আপনার জন্য চমৎকার লেকচার ও প্র্যাকটিস কুইজ তৈরি করেছেন! 🎓', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'এআই শিক্ষক কানেক্ট করতে ব্যর্থ হয়েছে। অনুগ্রহ করে ইন্টারনেট বা API কী চেক করুন।', 'error');
+    } finally {
+      setIsGeneratingAi(false);
+    }
+  };
+
+  const handleSaveAiLessonToSyllabus = () => {
+    if (!aiGeneratedLesson) return;
+    try {
+      const newTopicId = `ai_topic_${Date.now()}`;
+      const customTopic: Topic = {
+        id: newTopicId,
+        title: aiGeneratedLesson.title,
+        importantTag: aiGeneratedLesson.importantTag,
+        content: aiGeneratedLesson.content,
+        quickHack: aiGeneratedLesson.quickHack,
+        quiz: {
+          question: aiGeneratedLesson.quiz.question,
+          options: aiGeneratedLesson.quiz.options,
+          answerIndex: aiGeneratedLesson.quiz.answerIndex,
+          explanation: aiGeneratedLesson.quiz.explanation
+        }
+      };
+
+      // Retrieve existing custom topics list
+      const localCustom = localStorage.getItem('shadhin_custom_topics');
+      let customTopics: { subjectId: string; topic: Topic }[] = [];
+      if (localCustom) {
+        try {
+          customTopics = JSON.parse(localCustom);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      customTopics.push({ subjectId: saveToSubjectId, topic: customTopic });
+      localStorage.setItem('shadhin_custom_topics', JSON.stringify(customTopics));
+
+      // Update full dataset in state so user sees it live!
+      setSubjectLessons(prev => {
+        return prev.map(subj => {
+          if (subj.id === saveToSubjectId) {
+            return {
+              ...subj,
+              topics: [...subj.topics, customTopic]
+            };
+          }
+          return subj;
+        });
+      });
+
+      showToast(`লেকচারটি আপনার "${saveToSubjectId === 'bangla' ? 'বাংলা' : saveToSubjectId === 'english' ? 'ইংরেজি' : saveToSubjectId === 'math' ? 'গণিত' : saveToSubjectId === 'gk' ? 'সাধারণ জ্ঞান' : 'কম্পিউটার ও আইসিটি'}" সিলেবাসে যুক্ত হয়েছে!`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('সিলেবাসে সেভ করতে সমস্যা হয়েছে।', 'error');
     }
   };
 
@@ -586,9 +686,10 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
       </div>
 
       {/* 2. Top-Level Professional Tabs */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 shadow-xs">
+      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 shadow-xs">
         {[
           { id: 'lecture', label: 'বিষয়ভিত্তিক লেকচার', icon: <BookOpen className="w-4 h-3.5" /> },
+          { id: 'ai_coach', label: 'एআই শিক্ষক (Gemini)', icon: <Sparkles className="w-4 h-3.5 text-amber-500 animate-pulse" /> },
           { id: 'question_bank', label: 'বিগত প্রশ্ন ব্যাংক', icon: <FileText className="w-4 h-3.5" /> },
           { id: 'flashcards', label: 'স্মার্ট ফ্ল্যাশ কার্ড', icon: <Zap className="w-4 h-3.5" /> },
           { id: 'mnemonics', label: 'মুখস্থ রাখার ছন্দ', icon: <Sparkles className="w-4 h-3.5" /> },
@@ -618,6 +719,208 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
 
       {/* 3. Tab Contents Layout */}
       <div className="space-y-6">
+
+        {/* ==================== AI COACH TAB (Gemini-powered Infinite Preparation) ==================== */}
+        {activeTab === 'ai_coach' && (
+          <div className="space-y-6 text-left max-w-4xl mx-auto animate-fadeIn">
+            {/* Header / Intro Card */}
+            <div className="bg-gradient-to-r from-violet-50 to-amber-50/50 p-6 rounded-3xl border border-violet-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold text-violet-700 tracking-wider flex items-center gap-1.5 font-sans">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" /> Gemini AI Study Companion
+                </span>
+                <h3 className="text-base md:text-xl font-black text-gray-950 font-bengali">
+                  এআই ব্যক্তিগত শিক্ষক ও লেকচার জেনারেটর
+                </h3>
+                <p className="text-xs text-gray-500 max-w-xl leading-relaxed font-sans">
+                  যেকোনো পরীক্ষার অধ্যায় বা বিষয়ের নাম নিচে লিখুন। সেকেন্ডের মধ্যে এআই আপনার জন্য সমৃদ্ধ লেকচার নোটস, আকর্ষণীয় ম্যাজিক মেমোরাইজিং হ্যাক এবং প্র্যাকটিস কুইজ তৈরি করবে!
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] font-extrabold text-violet-800 bg-violet-100/60 px-3.5 py-1.5 rounded-full font-sans shrink-0 border border-violet-100">
+                <span>সার্ভার-সাইড জেনারেটিভ এআই সক্রিয়</span>
+              </div>
+            </div>
+
+            {/* AI Generator Input Section */}
+            <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-xs space-y-4">
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block font-sans">
+                  আপনি যে বিষয়ে পড়তে চাচ্ছেন সেই অধ্যায় বা বিষয়ের নাম লিখুন:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="যেমন: বাংলা জেন্ডার ও লিঙ্গ পরিবর্তন, প্রাচীন যুগের কবি ও সাহিত্য, Right Form of Verbs, উৎপাদক ও বীজগণিত সূত্র..."
+                    value={aiTopicInput}
+                    onChange={e => setAiTopicInput(e.target.value)}
+                    className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs font-semibold font-sans"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleGenerateAiLesson();
+                    }}
+                  />
+                  <button
+                    disabled={isGeneratingAi}
+                    onClick={handleGenerateAiLesson}
+                    className="px-6 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-xs font-black rounded-xl transition-all shadow-md disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed flex items-center gap-2 shrink-0 font-sans"
+                  >
+                    {isGeneratingAi ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        তৈরি হচ্ছে...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300 fill-amber-300" />
+                        লেকচার জেনারেট করুন
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Suggestions chips */}
+              <div className="space-y-2 pt-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block font-sans">জনপ্রিয় অধ্যায়ের সাজেশন (BCS & Job Special):</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'বাংলা সাহিত্যের পঞ্চপাণ্ডব',
+                    'Right Form of Verbs',
+                    'ত্রিকোণমিতি ও পরিমিতি সূত্র',
+                    'জাতিসংঘ ও নিরাপত্তা পরিষদ',
+                    'সাইবার নিরাপত্তা ও মেগা হ্যাকিং',
+                    'বাংলাদেশের ভৌগোলিক সীমানা'
+                  ].map(topic => (
+                    <button
+                      key={topic}
+                      onClick={() => {
+                        setAiTopicInput(topic);
+                      }}
+                      className="px-3 py-1.5 bg-gray-100 hover:bg-violet-50 hover:text-violet-700 text-[11px] font-bold text-gray-600 rounded-xl transition-all border border-gray-250 font-sans"
+                    >
+                      + {topic}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Generated Output Display */}
+            {aiGeneratedLesson && (
+              <div className="space-y-6">
+                {/* 1. Generated Lesson Details Card */}
+                <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-xs space-y-4">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-4">
+                    <div className="space-y-1">
+                      <span className="px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wide bg-violet-100 text-violet-800 rounded-lg font-sans">
+                        {aiGeneratedLesson.importantTag || "গুরুত্বপূর্ণতা: হাই-ভ্যালু কন্টেন্ট"}
+                      </span>
+                      <h2 className="text-xl font-black text-gray-950 pt-1 font-bengali">
+                        {aiGeneratedLesson.title}
+                      </h2>
+                    </div>
+                    
+                    {/* Add to Syllabus Form and Button */}
+                    <div className="flex items-center gap-2 bg-gray-50 p-2 border border-gray-150 rounded-2xl w-full md:w-auto">
+                      <select
+                        value={saveToSubjectId}
+                        onChange={e => setSaveToSubjectId(e.target.value)}
+                        className="flex-1 md:flex-initial px-2.5 py-1.5 bg-white border border-gray-200 rounded-xl text-[11px] font-bold text-gray-700 focus:outline-none"
+                      >
+                        <option value="bangla">বাংলা সিলেবাস</option>
+                        <option value="english">ইংরেজি সিলেবাস</option>
+                        <option value="math">গণিত সিলেবাস</option>
+                        <option value="gk">সাধারণ জ্ঞান</option>
+                        <option value="ict">কম্পিউটার ও আইসিটি</option>
+                      </select>
+                      <button
+                        onClick={handleSaveAiLessonToSyllabus}
+                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-xl transition-all flex items-center gap-1 shadow-sm font-sans shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        সিলেবাসে সংরক্ষণ
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Complete Lesson text */}
+                  <div className="text-sm text-gray-800 leading-relaxed font-bengali space-y-3 whitespace-pre-wrap pt-2">
+                    {aiGeneratedLesson.content}
+                  </div>
+
+                  {/* Magic Memorandum Hack Box */}
+                  <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3 mt-4">
+                    <div className="p-2 bg-amber-100/70 rounded-xl text-amber-700 shrink-0">
+                      <Lightbulb className="w-4 h-4 fill-amber-300" />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider font-sans">লেকচার ম্যাজিক হ্যাক (Memory Hack)</span>
+                      <p className="text-xs font-semibold text-amber-950 font-bengali">
+                        {aiGeneratedLesson.quickHack}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Interactive AI Generated Practice Quiz */}
+                <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-xs space-y-4">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase font-bold text-indigo-700 tracking-wider font-sans">
+                    <CheckCircle className="w-4 h-4 text-indigo-600" /> এআই মেধা যাচাই টেস্ট (Practice MCQ)
+                  </div>
+                  
+                  <h4 className="text-sm font-black text-gray-900 font-bengali">
+                    {aiGeneratedLesson.quiz.question}
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                    {aiGeneratedLesson.quiz.options.map((option, idx) => {
+                      const isSelected = selectedAiQuizAnswerIdx === idx;
+                      const isCorrect = aiGeneratedLesson.quiz.answerIndex === idx;
+                      const hasSubmitted = selectedAiQuizAnswerIdx !== null;
+
+                      let btnStyle = "bg-gray-50 border border-gray-200 hover:bg-violet-50 hover:border-violet-300 text-gray-800";
+                      if (hasSubmitted) {
+                        if (isCorrect) {
+                          btnStyle = "bg-emerald-50 border border-emerald-300 text-emerald-950 font-black";
+                        } else if (isSelected) {
+                          btnStyle = "bg-rose-50 border border-rose-300 text-rose-950 font-black";
+                        } else {
+                          btnStyle = "opacity-50 bg-gray-50 border border-gray-150 cursor-not-allowed text-gray-500";
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={idx}
+                          disabled={hasSubmitted}
+                          onClick={() => setSelectedAiQuizAnswerIdx(idx)}
+                          className={cn(
+                            "w-full px-4 py-3 rounded-2xl text-left text-xs font-semibold transition-all flex items-center justify-between",
+                            btnStyle
+                          )}
+                        >
+                          <span className="font-bengali">{idx + 1}. {option}</span>
+                          {hasSubmitted && isCorrect && <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0 border-none" />}
+                          {hasSubmitted && isSelected && !isCorrect && <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 border-none" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Reveal Explanation */}
+                  {selectedAiQuizAnswerIdx !== null && (
+                    <div className="bg-gray-50 p-4 border border-gray-200/80 rounded-2xl mt-4 text-left space-y-1.5 animate-fadeIn">
+                      <span className="text-[10px] uppercase font-black tracking-wider text-emerald-700 font-sans"> কুইজ প্রশ্নের চমৎকার ব্যাখ্যা:</span>
+                      <p className="text-xs font-medium text-gray-700 leading-relaxed font-bengali">
+                        {aiGeneratedLesson.quiz.explanation}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ==================== A. SUBJECTWISE LECTURES AND QUIZZES ==================== */}
         {activeTab === 'lecture' && (
@@ -1378,6 +1681,17 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
                 <Trash2 className="w-4 h-4" />
                 আমার প্রস্তাবিত প্রশ্নসমূহ মুছুন
               </button>
+            </div>
+
+            {/* Admin/User Role Separation and Rule Banner */}
+            <div className="bg-amber-50/70 border border-amber-200 p-4.5 rounded-2xl flex items-start gap-3 text-amber-900 shadow-xs">
+              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h5 className="text-xs font-black font-bengali">কন্ট্রিবিউশন সীমাবদ্ধতা ও এডমিন নীতি</h5>
+                <p className="text-xs font-medium leading-relaxed font-sans text-gray-700">
+                  নিরাপত্তা ও বিষয়ের মানদণ্ড বজায় রাখার স্বার্থে সাধারণ ব্যবহারকারীগণ শুধুমাত্র বিগত সালের এমসিকিউ ট্রিকস বা প্রশ্ন যুক্ত করতে পারবেন। লেকচার কন্টেন্ট, ফ্ল্যাশকার্ড ও ছন্দসমূহ সম্পূর্ণভাবে এডমিন কর্তৃক প্রধান <strong>এডমিন প্যানেল</strong> থেকে সরাসরি নিয়ন্ত্রিত ও আপডেট হয়ে থাকে।
+                </p>
+              </div>
             </div>
 
             {/* Form Input fields - Centered Form Container */}

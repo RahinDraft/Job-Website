@@ -6,6 +6,7 @@ import { createServer } from "http";
 import multer from "multer";
 import fs from "fs";
 import { dbClient } from "./db-client.js";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -723,6 +724,117 @@ async function startServer() {
     } catch (error) {
       console.error("Error deleting contact message:", error);
       res.status(500).json({ error: "Failed to delete message" });
+    }
+  });
+
+  // AI-Powered INFINITE Study Assistant route (Gemini 3.5-flash)
+  let aiInstance: GoogleGenAI | null = null;
+  function getAI() {
+    if (!aiInstance) {
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) {
+        throw new Error("GEMINI_API_KEY environment variable is missing from your deployment settings");
+      }
+      aiInstance = new GoogleGenAI({
+        apiKey: key,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
+    }
+    return aiInstance;
+  }
+
+  app.post("/api/ai/generate-lesson", async (req, res) => {
+    const { topic } = req.body;
+    if (!topic || typeof topic !== "string" || topic.trim().length === 0) {
+      return res.status(400).json({ error: "অনুগ্রহ করে একটি সঠিক বিষয়ের নাম প্রদান করুন (Please provide a valid topic name)" });
+    }
+
+    try {
+      const ai = getAI();
+      const prompt = `You are an expert career training specialist and BCS (Bangladesh Civil Service) cadre trainer.
+Generate a comprehensive, highly premium Study Lesson and an interactive single MCQ question in Bengali about the topic: "${topic}".
+
+The lesson must follow these guidelines:
+1. Provide deep and comprehensive explanation of the key concepts, with real-life examples, formulas, or bullet points. It must be highly detailed so that job candidates find it incredibly useful and satisfactory.
+2. Formulate a "Quick Hack" (ম্যাজিক ট্রিক / হ্যাক) that helps candidates instantly memorize the key concepts or formulas easily.
+3. Formulate a 1-sentence or 2-sentence "importantTag" that indicates how frequently it appears in exams, e.g., "গুরুত্বপূর্ণতা: ৯৮% ফ্রিকোয়েন্সি (নিশ্চিত কমন)".
+4. Construct exactly 1 high-quality conceptual standard MCQ practice question with:
+   - 4 plausible Bengali options (options).
+   - "answerIndex" representing the 0-based index of the correct option (0, 1, 2, or 3).
+   - A detailed "explanation" in Bengali explaining why that option is correct and why other options are incorrect.
+
+Ensure that the output is entirely in Bengali, professional, highly encouraging, and matches the requested JSON schema.`;
+
+      const response = await (async () => {
+        const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite"];
+        let lastError: any = null;
+
+        for (const modelName of modelsToTry) {
+          const maxRetries = 2;
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              console.log(`Attempting to generate lesson using ${modelName} (attempt ${attempt}/${maxRetries})...`);
+              const contentRes = await ai.models.generateContent({
+                model: modelName,
+                contents: prompt,
+                config: {
+                  responseMimeType: "application/json",
+                  responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                      title: { type: Type.STRING },
+                      importantTag: { type: Type.STRING },
+                      content: { type: Type.STRING },
+                      quickHack: { type: Type.STRING },
+                      quiz: {
+                        type: Type.OBJECT,
+                        properties: {
+                          question: { type: Type.STRING },
+                          options: {
+                            type: Type.ARRAY,
+                            items: { type: Type.STRING }
+                          },
+                          answerIndex: { type: Type.INTEGER },
+                          explanation: { type: Type.STRING }
+                        },
+                        required: ["question", "options", "answerIndex", "explanation"]
+                      }
+                    },
+                    required: ["title", "importantTag", "content", "quickHack", "quiz"]
+                  }
+                }
+              });
+              return contentRes;
+            } catch (err: any) {
+              lastError = err;
+              console.warn(`Attempt ${attempt} with model ${modelName} failed. Error:`, err?.message || err);
+              if (attempt < maxRetries) {
+                // Wait 1.5 seconds before retrying
+                await new Promise(resolve => setTimeout(resolve, 1500));
+              }
+            }
+          }
+        }
+        throw lastError;
+      })();
+
+      const responseText = response.text;
+      if (!responseText) {
+        throw new Error("Empty response received from Gemini engine.");
+      }
+
+      const generatedData = JSON.parse(responseText.trim());
+      res.json(generatedData);
+    } catch (error: any) {
+      console.error("Gemini lesson generator error:", error);
+      res.status(500).json({
+        error: "এআই লেকচার জেনারেট করতে সাময়িক সমস্যা হচ্ছে। অনুগ্রহ করে আপনার GEMINI_API_KEY চেক করুন অথবা কিছু সময় পর পুনরায় চেষ্টা করুন।",
+        details: error?.message || error
+      });
     }
   });
 
