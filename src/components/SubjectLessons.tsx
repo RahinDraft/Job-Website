@@ -116,7 +116,7 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
   });
 
   // Contribution Form states
-  const [contributorRole, setContributorRole] = useState<'user' | 'admin'>('admin');
+  const [contributorRole, setContributorRole] = useState<'user' | 'admin'>('user');
   const [contributionType, setContributionType] = useState<'past_question' | 'lecture' | 'flashcard' | 'mnemonic'>('past_question');
 
   // Form inputs
@@ -1358,17 +1358,17 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
 
         {/* ==================== F. CORE QUESTION AND CONTENT CONTRIBUTION ENGINE ==================== */}
         {activeTab === 'contribute' && (
-          <div className="space-y-6 text-left">
+          <div className="space-y-6 text-left max-w-4xl mx-auto">
             <div className="bg-gradient-to-r from-emerald-55 to-emerald-100/30 p-6 rounded-3xl border border-emerald-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div className="space-y-1">
                 <span className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider flex items-center gap-1.5 font-sans">
-                  💎 Shadhin Career Portal Contributor Dashboard
+                  👥 Shadhin Career Portal Question Contribution
                 </span>
                 <h3 className="text-base md:text-xl font-black text-gray-950 font-bengali">
-                  প্রশ্ন ও প্রস্তুতি কন্টেন্ট কন্ট্রিবিউশন প্যানেল
+                  প্রশ্ন প্রস্তাব ও কন্ট্রিবিউশন প্যানেল
                 </h3>
                 <p className="text-xs text-gray-500 max-w-xl leading-relaxed font-sans">
-                  এখানে একজন এডমিন সরাসরি কন্টেন্ট প্রকাশ করতে পারেন এবং একজন ব্যবহারকারী কোনো প্রশ্ন বা লেকচার প্রস্তাব করতে পারেন। আপনার কন্ট্রিবিউশন লোকাল স্টোরেজে লাইভ থাকবে!
+                  এখানে একজন সাধারণ ইউজার যেকোনো বিগত সালের পরীক্ষা বা প্রস্তুতিমূলক গুরুত্বপূর্ণ MCQ প্রশ্ন প্রস্তাব করতে পারেন। আপনার কন্ট্রিবিউটকৃত প্রশ্নটি পর্যালোচনার পর স্থায়ীভাবে প্রকাশ করা হবে।
                 </p>
               </div>
               <button
@@ -1376,94 +1376,15 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
                 className="px-4.5 py-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-700 text-xs font-bold rounded-2xl transition-all shadow-xs flex items-center gap-2 font-sans shrink-0"
               >
                 <Trash2 className="w-4 h-4" />
-                কাস্টম ড্যাটা মুছুন (Reset)
+                আমার প্রস্তাবিত প্রশ্নসমূহ মুছুন
               </button>
             </div>
 
-            {/* Selector Option Bars */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Form Input fields - Centered Form Container */}
+            <div className="bg-white p-6 rounded-3xl border border-gray-150 shadow-xs">
               
-              {/* Form Config Left Side */}
-              <div className="md:col-span-1 space-y-4">
-                
-                {/* 1. Select Contributor Role */}
-                <div className="bg-white p-5 rounded-3xl border border-gray-150 space-y-3.5 shadow-xs">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest font-sans">
-                    ১. কন্ট্রিবিউটর টাইপ সিল্কট
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setContributorRole('user')}
-                      className={cn(
-                        "p-3 rounded-2xl border flex flex-col items-center gap-1 text-[11px] font-bold transition-all text-center",
-                        contributorRole === 'user'
-                          ? "bg-purple-50 border-purple-500 text-purple-900 shadow-xs"
-                          : "bg-white border-gray-100 text-gray-550"
-                      )}
-                    >
-                      <User className="w-4 h-4 text-purple-600" />
-                      ইউজার মোড (User)
-                    </button>
-                    <button
-                      onClick={() => setContributorRole('admin')}
-                      className={cn(
-                        "p-3 rounded-2xl border flex flex-col items-center gap-1 text-[11px] font-bold transition-all text-center",
-                        contributorRole === 'admin'
-                          ? "bg-emerald-55 border-emerald-500 text-emerald-900 shadow-xs"
-                          : "bg-white border-gray-100 text-gray-550"
-                      )}
-                    >
-                      <Award className="w-4 h-4 text-emerald-600" />
-                      এডমিন মোড (Admin)
-                    </button>
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-2xl text-[10px] text-gray-400 leading-relaxed leading-normal flex gap-1.5 items-start font-sans">
-                    <AlertCircle className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
-                    <span>এডমিন মোডে নতুন কন্টেন্ট সিলেক্ট করলে তা সরাসরি সবার জন্য লাইভ স্টাডি ড্যাশবোর্ডে যুক্ত হয়ে যাবে।</span>
-                  </div>
-                </div>
-
-                {/* 2. Select Content Type to Add */}
-                <div className="bg-white p-5 rounded-3xl border border-gray-150 space-y-3.5 shadow-xs font-sans">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest text-left">
-                    ২. কন্টেন্টের ধরণ সিলেক্ট করুন
-                  </h4>
-                  <div className="space-y-2">
-                    {[
-                      { id: 'past_question', label: 'বিগত চাকরির প্রশ্ন ব্যাংক', sub: 'BCS, Bank, Primary MCQs', icon: <FileText className="w-4 h-4" /> },
-                      { id: 'lecture', label: 'লেকচার নোট ও কুইজ প্রশ্ন', sub: 'Detailed Lesson with Quiz', icon: <BookOpen className="w-4 h-4" /> },
-                      { id: 'flashcard', label: 'স্মার্ট ফ্লাশকার্ড (Active Recall)', sub: 'Front & Back Vocab / Formula', icon: <Zap className="w-4 h-4" /> },
-                      { id: 'mnemonic', label: 'মনে রাখার রূপক ছন্দ', sub: 'Rhymes & formulas', icon: <Sparkles className="w-4 h-4" /> },
-                    ].map(type => (
-                      <button
-                        key={type.id}
-                        onClick={() => setContributionType(type.id as any)}
-                        className={cn(
-                          "w-full p-3 rounded-2xl border text-left flex items-start gap-3 transition-colors",
-                          contributionType === type.id
-                            ? "bg-emerald-55 border-emerald-500 text-emerald-900"
-                            : "bg-white border-gray-50 hover:bg-gray-50 text-gray-600"
-                        )}
-                      >
-                        <div className="p-2 bg-gray-50 border border-gray-100 rounded-xl group-hover:bg-white shrink-0 mt-0.5">
-                          {type.icon}
-                        </div>
-                        <div>
-                          <div className="text-xs font-bold text-gray-900">{type.label}</div>
-                          <div className="text-[10px] text-gray-400 font-medium mt-0.5 leading-none">{type.sub}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Form Input fields Right Side */}
-              <form className="md:col-span-2 bg-white p-6 rounded-3xl border border-gray-150 space-y-6 shadow-xs font-sans">
-                
-                {/* A. PAST MCQS QUESTION INPUT FORM */}
-                {contributionType === 'past_question' && (
+              {/* A. PAST MCQS QUESTION INPUT FORM */}
+              {contributionType === 'past_question' && (
                   <div className="space-y-4">
                     <h3 className="text-base font-black text-gray-950 font-bengali">
                       যুক্ত করুন: বিগত সালের এমসিকিউ (MCQs)
@@ -1865,12 +1786,10 @@ export const SubjectLessons: React.FC<SubjectLessonsProps> = ({ onBack, showToas
                   </div>
                 )}
 
-              </form>
+              </div>
 
             </div>
-
-          </div>
-        )}
+          )}
 
       </div>
 

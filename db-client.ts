@@ -2,34 +2,237 @@ import { supabase } from "./supabase.js";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize SQLite fallback database
-const sqliteDb = new Database(path.join(process.cwd(), "jobs.db"));
+// Initialize SQLite fallback database with auto-detection for corruption and schema creation
+const dbPath = path.join(process.cwd(), "jobs.db");
+
+function initSchema(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS jobs (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      company TEXT NOT NULL,
+      category TEXT NOT NULL,
+      location TEXT NOT NULL,
+      deadline TEXT NOT NULL,
+      description TEXT NOT NULL,
+      requirements TEXT NOT NULL,
+      salary TEXT,
+      companyLogoUrl TEXT,
+      circularImageUrl TEXT,
+      positions TEXT,
+      applicationFee TEXT,
+      searchKeywords TEXT,
+      seoTitle TEXT,
+      seoDescription TEXT,
+      minEducationLevel INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user',
+      fullName TEXT,
+      email TEXT,
+      mobile TEXT UNIQUE,
+      securityQuestion TEXT,
+      securityAnswer TEXT,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      isOnline INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS site_stats (
+      id INTEGER PRIMARY KEY,
+      total_visitors INTEGER DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS cvs (
+      userId TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      data TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS saved_jobs (
+      userId TEXT REFERENCES users(id) ON DELETE CASCADE,
+      jobId TEXT REFERENCES jobs(id) ON DELETE CASCADE,
+      savedAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (userId, jobId)
+    );
+
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      userId TEXT REFERENCES users(id) ON DELETE CASCADE,
+      jobId TEXT REFERENCES jobs(id) ON DELETE CASCADE,
+      selectedPost TEXT,
+      transactionId TEXT,
+      paymentMethod TEXT,
+      status TEXT NOT NULL DEFAULT 'Ordered',
+      statusHistory TEXT,
+      amount TEXT NOT NULL,
+      jobFee TEXT,
+      serviceCharge TEXT,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      demoCopyUrl TEXT,
+      finalCopyUrl TEXT,
+      adminNote TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      jobId TEXT REFERENCES jobs(id) ON DELETE CASCADE,
+      userId TEXT REFERENCES users(id) ON DELETE CASCADE,
+      userName TEXT NOT NULL,
+      text TEXT NOT NULL,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS replies (
+      id TEXT PRIMARY KEY,
+      commentId TEXT REFERENCES comments(id) ON DELETE CASCADE,
+      userId TEXT REFERENCES users(id) ON DELETE CASCADE,
+      userName TEXT NOT NULL,
+      text TEXT NOT NULL,
+      isAdmin INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS contact_messages (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT DEFAULT 'new',
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS service_requests (
+      id TEXT PRIMARY KEY,
+      userId TEXT REFERENCES users(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      photoUrl TEXT,
+      signatureUrl TEXT,
+      processedPhotoUrl TEXT,
+      processedSignatureUrl TEXT,
+      transactionId TEXT NOT NULL,
+      paymentMethod TEXT,
+      status TEXT NOT NULL DEFAULT 'Pending',
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    INSERT INTO site_stats (id, total_visitors) VALUES (1, 0) ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO site_settings (key, value) VALUES 
+      ('siteName', 'চাকরি সেবা'),
+      ('primaryColor', '#059669'),
+      ('contactPhone', '01700000000'),
+      ('contactEmail', 'info@chakriseba.com'),
+      ('noticeText', 'আমাদের সাইটে আপনাকে স্বাগত! চাকরি সেবা - আপনার ক্যারিয়ারের বিশ্বস্ত সঙ্গী।'),
+      ('bkashNumber', '01700000000'),
+      ('nagadNumber', '01700000000'),
+      ('applicationFee', '১০০'),
+      ('heroTitle', 'আপনার স্বপ্নের চাকরি খুঁজুন'),
+      ('heroSubtitle', 'বাংলাদেশের সবচেয়ে বিশ্বস্ত চাকরি সেবা প্ল্যাটফর্ম'),
+      ('footerText', '© 2026 চাকরি সেবা। সর্বস্বত্ব সংরক্ষিত।'),
+      ('facebookLink', ''),
+      ('youtubeLink', ''),
+      ('logoUrl', ''),
+      ('aboutText', 'আমরা বাংলাদেশের অন্যতম প্রধান চাকরি সেবা প্ল্যাটফর্ম। আমাদের লক্ষ্য হলো চাকরিপ্রার্থী এবং নিয়োগকর্তাদের মধ্যে একটি সেতুবন্ধন তৈরি করা।'),
+      ('contactAddress', 'ঢাকা, বাংলাদেশ'),
+      ('paymentInstructions', 'নিচের যেকোনো নাম্বারে সেন্ড মানি করে Transaction ID (TrxID) দিন।'),
+      ('seoTitle', 'চাকরি সেবা - বাংলাদেশের ১ নম্বর চাকরির পোর্টাল | Chakri Seba'),
+      ('seoDescription', 'সরকারি ও বেসরকারি চাকরির সবশেষ সার্কুলার ও ঘরে বসে সহজে আবেদনের বিশ্বস্ত মাধ্যম।'),
+      ('serviceCharge', '50'),
+      ('whatsappNumber', '01700000000')
+    ON CONFLICT (key) DO NOTHING;
+
+    INSERT INTO users (id, username, password, role, fullName, mobile)
+    VALUES ('admin-id-1234', 'admin', 'admin123', 'admin', 'System Admin', '01700000000')
+    ON CONFLICT (username) DO NOTHING;
+  `);
+}
+
+function connectDb(): Database.Database {
+  let db: any;
+  try {
+    db = new Database(dbPath);
+    // test connection
+    db.prepare("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1").all();
+  } catch (err: any) {
+    console.error("⚠️ SQLite malformed/corrupted file detected or failed connection. Resetting database file. Error:", err?.message || err);
+    try {
+      if (fs.existsSync(dbPath)) {
+        fs.unlinkSync(dbPath);
+      }
+    } catch (e) {
+      console.error("⚠️ Failed to delete corrupted jobs.db file:", e);
+    }
+    db = new Database(dbPath);
+  }
+
+  try {
+    initSchema(db);
+  } catch (createErr) {
+    console.error("⚠️ Error initializing sqlite database schema:", createErr);
+  }
+  return db;
+}
+
+const sqliteDb = connectDb();
+
+let supabaseIsHealthy = true;
+let lastErrorTime = 0;
+const OFFLINE_COOLDOWN_MS = 60000; // 1 minute of complete offline mode if Supabase fails once
+
+async function withTimeout<T>(promise: Promise<T>, ms: number = 800): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error("Supabase request timed out"));
+    }, ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
+}
 
 // Helper to run query with dynamic fallback and smart array/object merging
 async function runQueryWithFallback<T>(
   supabaseOp: () => PromiseLike<any> | Promise<any>,
   sqliteOp: () => T
 ): Promise<T> {
+  const sqliteData = sqliteOp();
+
+  if (!supabaseIsHealthy && (Date.now() - lastErrorTime < OFFLINE_COOLDOWN_MS)) {
+    return sqliteData;
+  }
+
   let supabaseData: any = null;
   let hasSupabaseError = false;
   try {
-    const { data, error } = await supabaseOp();
+    const { data, error } = await withTimeout(Promise.resolve(supabaseOp()), 800);
     if (!error && data !== null) {
       supabaseData = data;
     } else if (error) {
       hasSupabaseError = true;
-      console.warn(`⚠️ Supabase query warning (Code: ${error.code || 'unknown'}): ${error.message}.`);
+      supabaseIsHealthy = false;
+      lastErrorTime = Date.now();
     }
   } catch (err: any) {
     hasSupabaseError = true;
-    console.warn(`⚠️ Supabase query exception: ${err?.message || err}.`);
+    supabaseIsHealthy = false;
+    lastErrorTime = Date.now();
   }
-
-  const sqliteData = sqliteOp();
 
   if (hasSupabaseError || supabaseData === null) {
     return sqliteData;
@@ -65,22 +268,29 @@ async function runSingleQueryWithFallback<T>(
   supabaseOp: () => PromiseLike<any> | Promise<any>,
   sqliteOp: () => T | null
 ): Promise<T | null> {
+  const sqliteData = sqliteOp();
+
+  if (!supabaseIsHealthy && (Date.now() - lastErrorTime < OFFLINE_COOLDOWN_MS)) {
+    return sqliteData;
+  }
+
   let supabaseData: any = null;
   let hasSupabaseError = false;
   try {
-    const { data, error } = await supabaseOp();
+    const { data, error } = await withTimeout(Promise.resolve(supabaseOp()), 800);
     if (!error && data !== null) {
       supabaseData = data;
     } else if (error && error.code !== 'PGRST116') { // PGRST116 is normal for empty single rows
       hasSupabaseError = true;
-      console.warn(`⚠️ Supabase query single warning (Code: ${error.code || 'unknown'}): ${error.message}.`);
+      supabaseIsHealthy = false;
+      lastErrorTime = Date.now();
     }
   } catch (err: any) {
     hasSupabaseError = true;
-    console.warn(`⚠️ Supabase query single exception: ${err?.message || err}.`);
+    supabaseIsHealthy = false;
+    lastErrorTime = Date.now();
   }
 
-  const sqliteData = sqliteOp();
   if (hasSupabaseError || !supabaseData) {
     return sqliteData;
   }
@@ -93,22 +303,36 @@ async function runWriteWithFallback(
   supabaseOp: () => PromiseLike<any> | Promise<any>,
   sqliteOp: () => void
 ): Promise<void> {
+  if (!supabaseIsHealthy && (Date.now() - lastErrorTime < OFFLINE_COOLDOWN_MS)) {
+    try {
+      sqliteOp();
+    } catch (e) {}
+    return;
+  }
+
   try {
-    const { error } = await supabaseOp();
+    const { error } = await withTimeout(Promise.resolve(supabaseOp()), 1000);
     if (!error) {
       // Sync with local SQLite so they both have the data
       try {
         sqliteOp();
       } catch (sqliteErr: any) {
-        console.error("SQLite secondary sync error:", sqliteErr?.message || sqliteErr);
+        // Silent local fallback
       }
       return;
+    } else {
+      supabaseIsHealthy = false;
+      lastErrorTime = Date.now();
     }
-    console.warn(`⚠️ Supabase write warning (Code: ${error.code || 'unknown'}): ${error.message}. Writing only to SQLite.`);
   } catch (err: any) {
-    console.warn(`⚠️ Supabase write exception: ${err?.message || err}. Writing only to SQLite.`);
+    supabaseIsHealthy = false;
+    lastErrorTime = Date.now();
   }
-  sqliteOp();
+  sqliteDb.transaction(() => {
+    try {
+      sqliteOp();
+    } catch (e) {}
+  })();
 }
 
 export const dbClient = {
@@ -484,12 +708,18 @@ export const dbClient = {
   },
 
   async incrementPageViews() {
-    try {
-      // Supabase
-      const { data: stats } = await supabase.from("site_stats").select("total_visitors").eq("id", 1).single();
-      const currentVisitors = stats?.total_visitors || 0;
-      await supabase.from("site_stats").update({ total_visitors: currentVisitors + 1 }).eq("id", 1);
-    } catch (e) {}
+    if (supabaseIsHealthy && (Date.now() - lastErrorTime > OFFLINE_COOLDOWN_MS)) {
+      try {
+        // Supabase
+        const result = await withTimeout<any>(Promise.resolve(supabase.from("site_stats").select("total_visitors").eq("id", 1).single()), 500);
+        const stats = result?.data || null;
+        const currentVisitors = stats?.total_visitors || 0;
+        await withTimeout<any>(Promise.resolve(supabase.from("site_stats").update({ total_visitors: currentVisitors + 1 }).eq("id", 1)), 500);
+      } catch (e) {
+        supabaseIsHealthy = false;
+        lastErrorTime = Date.now();
+      }
+    }
 
     try {
       // Local SQLite
@@ -961,10 +1191,9 @@ const seedSupabaseAdmin = async () => {
         fullName: "System Admin",
         mobile: "01700000000"
       });
-      console.log("✅ Admin user seeded successfully into Supabase users table.");
     }
   } catch (err) {
-    console.warn("⚠️ Could not seed admin user in Supabase:", err);
+    // Quiet background task
   }
 };
-seedSupabaseAdmin().catch(console.error);
+seedSupabaseAdmin().catch(() => {});

@@ -22,6 +22,7 @@ import {
 import { Job, JobCategory, AdminStats, Stats, Order, SiteSettings, ContactMessage, ServiceRequest } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
+import { AdminPrepManager } from './AdminPrepManager';
 import { twMerge } from 'tailwind-merge';
 
 function cn(...inputs: ClassValue[]) {
@@ -29,8 +30,8 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface AdminDashboardProps {
-  adminView: 'dashboard' | 'jobs' | 'users' | 'orders' | 'settings' | 'messages' | 'service-requests';
-  setAdminView: (view: 'dashboard' | 'jobs' | 'users' | 'orders' | 'settings' | 'messages' | 'service-requests') => void;
+  adminView: 'dashboard' | 'jobs' | 'users' | 'orders' | 'settings' | 'messages' | 'service-requests' | 'preps';
+  setAdminView: (view: 'dashboard' | 'jobs' | 'users' | 'orders' | 'settings' | 'messages' | 'service-requests' | 'preps') => void;
   adminStats: AdminStats;
   stats: Stats | null;
   jobs: Job[];
@@ -926,6 +927,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </tbody>
           </table>
         </div>
+      ) : adminView === 'preps' ? (
+        <AdminPrepManager showToast={showToast} />
       ) : null}
 
       {/* Service Request Update Modal */}

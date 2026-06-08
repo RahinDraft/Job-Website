@@ -56,7 +56,8 @@ import {
   UserCircle,
   ShieldCheck,
   Eye,
-  EyeOff
+  EyeOff,
+  Layers
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
@@ -2416,7 +2417,7 @@ export default function App() {
     }
     return false;
   };
-  const [adminView, setAdminView] = useState<'dashboard' | 'jobs' | 'users' | 'orders' | 'settings' | 'messages' | 'service-requests'>('dashboard');
+  const [adminView, setAdminView] = useState<'dashboard' | 'jobs' | 'users' | 'orders' | 'settings' | 'messages' | 'service-requests' | 'preps'>('dashboard');
   const [users, setUsers] = useState<any[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [serviceRequests, setServiceRequests] = useState<ServiceRequest[]>([]);
@@ -3793,6 +3794,21 @@ export default function App() {
             </button>
             <button 
               onClick={() => {
+                setAdminView('preps');
+                if (window.innerWidth < 1024) setIsSidebarOpen(false);
+              }}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                adminView === 'preps' ? "bg-emerald-800 text-white shadow-inner" : "hover:bg-emerald-800/50 text-emerald-100",
+                !isSidebarOpen && "lg:justify-center lg:px-0"
+              )}
+              title="প্রস্তুতি কন্টেন্ট"
+            >
+              <Layers className="w-4 h-4" />
+              {(isSidebarOpen || window.innerWidth >= 1024) && <span className={cn("truncate", !isSidebarOpen && "lg:hidden")}>প্রস্তুতি কন্টেন্ট</span>}
+            </button>
+            <button 
+              onClick={() => {
                 setAdminView('messages');
                 if (window.innerWidth < 1024) setIsSidebarOpen(false);
               }}
@@ -3847,7 +3863,8 @@ export default function App() {
                    adminView === 'users' ? 'ইউজার লিস্ট' : 
                    adminView === 'orders' ? 'অর্ডার লিস্ট' : 
                    adminView === 'messages' ? 'মেসেজ লিস্ট' : 
-                   adminView === 'service-requests' ? 'সার্ভিস রিকোয়েস্ট' : 'সাইট সেটিংস'}
+                   adminView === 'service-requests' ? 'সার্ভিস রিকোয়েস্ট' : 
+                   adminView === 'preps' ? 'প্রস্তুতি ও কন্ট্রিবিউশন কন্ট্রোল' : 'সাইট সেটিংস'}
                 </h2>
                 <p className="text-gray-500 text-xs lg:text-sm truncate">
                   {adminView === 'dashboard' ? 'আপনার পোর্টালের যাবতীয় কার্যক্রমের সারসংক্ষেপ।' : 
@@ -3855,7 +3872,8 @@ export default function App() {
                    adminView === 'users' ? 'রেজিস্ট্রেশনকৃত সকল ইউজারের তালিকা ও তথ্য।' :
                    adminView === 'orders' ? 'সকল পেমেন্ট ও আবেদন অর্ডারের তালিকা।' : 
                    adminView === 'messages' ? 'ইউজারদের পাঠানো সকল মেসেজের তালিকা।' : 
-                   adminView === 'service-requests' ? 'ইউজারদের ছবি ও স্বাক্ষর সাইজ করার রিকোয়েস্ট।' : 'কোডিং ছাড়াই এখান থেকে পুরো সাইট কন্ট্রোল করুন।'}
+                   adminView === 'service-requests' ? 'ইউজারদের ছবি ও স্বাক্ষর সাইজ করার রিকোয়েস্ট।' : 
+                   adminView === 'preps' ? 'ব্যবহারকারীদের প্রস্তাবকৃত প্রশ্ন সংযোজন, বিয়োজন এবং সংশোধন করুন।' : 'কোডিং ছাড়াই এখান থেকে পুরো সাইট কন্ট্রোল করুন।'}
                 </p>
               </div>
             </div>

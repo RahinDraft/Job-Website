@@ -152,6 +152,30 @@ const AddressFields = ({ title, type, formData, setFormData, sameAsPresent, setS
 
 const cn = (...classes: (string | boolean | undefined)[]) => classes.filter(Boolean).join(' ');
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08
+    }
+  }
+} as const;
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 16, scale: 0.98 },
+  show: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { 
+      type: 'spring' as const, 
+      stiffness: 120, 
+      damping: 14 
+    } 
+  }
+} as const;
+
 export const UserDashboard: React.FC<UserDashboardProps> = ({ 
   user, 
   onLogout, 
@@ -456,11 +480,80 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
         )}
 
         {activeTab === 'profile' ? (
-          <div className="max-w-2xl space-y-8">
-            <header>
+          <div className="max-w-4xl space-y-8">
+            <motion.header
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               <h1 className="text-2xl font-bold text-gray-900">আমার প্রোফাইল</h1>
-              <p className="text-gray-500">আপনার ব্যক্তিগত তথ্য এখানে দেখুন</p>
-            </header>
+              <p className="text-gray-500">আপনার ব্যক্তিগত তথ্য এবং ড্যাশবোর্ড ওভারভিউ</p>
+            </motion.header>
+
+            {/* Dynamic Animated Stats Cards */}
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+            >
+              {[
+                { 
+                  label: 'মোট আবেদনকৃত জব', 
+                  value: orders.length, 
+                  subText: 'আবেদনের স্ট্যাটাস ট্র্যাকিং করুন',
+                  icon: <Briefcase className="w-5 h-5 text-indigo-600" />, 
+                  color: 'bg-indigo-50/60 border-indigo-100 hover:bg-indigo-50 hover:border-indigo-200 text-indigo-700',
+                  action: () => setActiveTab('orders')
+                },
+                { 
+                  label: 'সেভ করা জব', 
+                  value: savedJobs.length, 
+                  subText: 'পছন্দের বিজ্ঞপ্তি সংরক্ষণ',
+                  icon: <Bookmark className="w-5 h-5 text-amber-600" />, 
+                  color: 'bg-amber-50/60 border-amber-100 hover:bg-amber-50 hover:border-amber-200 text-amber-700',
+                  action: () => setActiveTab('saved')
+                },
+                { 
+                  label: 'সিভি স্ট্যাটাস', 
+                  value: cv ? 'তৈরি আছে' : 'তৈরি নেই', 
+                  subText: cv ? 'প্রফেশনাল রেজ্যুম সম্পন্ন' : 'আবেদনের জন্য সিভি তৈরি করুন',
+                  icon: <FileText className="w-5 h-5 text-emerald-600" />, 
+                  color: 'bg-emerald-50/60 border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200 text-emerald-700',
+                  action: () => setActiveTab('cv')
+                },
+                { 
+                  label: 'অ্যাকাউন্ট টাইপ', 
+                  value: user.role === 'admin' ? 'এডমিন' : 'ইউজার', 
+                  subText: user.role === 'admin' ? 'এডমিন প্যানেল এক্সেস' : 'স্ট্যান্ডার্ড অ্যাকাউন্ট',
+                  icon: <UserIcon className="w-5 h-5 text-pink-600" />, 
+                  color: 'bg-pink-50/60 border-pink-100 text-pink-700 cursor-default',
+                  action: () => {}
+                }
+              ].map((stat, idx) => (
+                <motion.div
+                  key={idx}
+                  variants={cardVariants}
+                  whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                  onClick={stat.action}
+                  className={cn(
+                    "p-5 rounded-2xl border bg-white shadow-sm flex flex-col justify-between cursor-pointer transition-all duration-300",
+                    stat.color
+                  )}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="p-2.5 rounded-xl bg-white/90 shadow-sm border border-black/5">
+                      {stat.icon}
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <p className="text-xl font-extrabold text-gray-900 tracking-tight">{stat.value}</p>
+                    <p className="text-xs font-bold text-gray-700 mt-1">{stat.label}</p>
+                    <p className="text-[10px] text-gray-500 mt-0.5 font-medium leading-normal">{stat.subText}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
 
             {dataLoading ? (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden animate-pulse">
@@ -476,36 +569,48 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <motion.div 
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+              >
+                <div className="px-8 py-5 border-b border-gray-50 bg-gray-50/20">
+                  <h3 className="font-bold text-gray-900">ব্যক্তিগত প্রোফাইল কার্ড</h3>
+                </div>
                 <div className="p-8 space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase">পুরো নাম</label>
-                      <p className="text-lg font-medium text-gray-900">{user.fullName}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">পুরো নাম</label>
+                      <p className="text-lg font-bold text-gray-800">{user.fullName}</p>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase">ইউজারনেম</label>
-                      <p className="text-lg font-medium text-gray-900">@{user.username}</p>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">ইউজারনেম</label>
+                      <p className="text-lg font-bold text-gray-800">@{user.username}</p>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase">মোবাইল</label>
-                      <p className="text-lg font-medium text-gray-900">{user.mobile}</p>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">মোবাইল নম্বর</label>
+                      <p className="text-lg font-bold text-gray-800">{user.mobile}</p>
                     </div>
-                    <div>
-                      <label className="text-xs font-bold text-gray-400 uppercase">ইমেইল</label>
-                      <p className="text-lg font-medium text-gray-900">{user.email || 'N/A'}</p>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">ইমেইল ঠিকানা</label>
+                      <p className="text-lg font-bold text-gray-800">{user.email || 'N/A'}</p>
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
           </div>
         ) : activeTab === 'saved' ? (
           <div className="max-w-4xl space-y-8">
-            <header>
+            <motion.header
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
               <h1 className="text-2xl font-bold text-gray-900">সেভ করা চাকরি</h1>
               <p className="text-gray-500">আপনার পছন্দের চাকরির বিজ্ঞপ্তিগুলো এখানে পাবেন</p>
-            </header>
+            </motion.header>
 
             {dataLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -534,68 +639,81 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 ))}
               </div>
             ) : savedJobs.length === 0 ? (
-              <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center"
+              >
                 <Bookmark className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-bold text-gray-900">কোনো চাকরি সেভ করা নেই</h3>
                 <p className="text-gray-500">পছন্দের চাকরির বিজ্ঞপ্তিগুলোতে বুকমার্ক আইকনে ক্লিক করে সেভ করুন</p>
-              </div>
+              </motion.div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <motion.div 
+                variants={containerVariants}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
+              >
                 {savedJobs.map((job) => (
-                  <div
+                  <motion.div
                     key={job.id}
-                    className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group relative"
+                    variants={cardVariants}
+                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group relative flex flex-col justify-between"
                   >
-                    <button
-                      onClick={() => onToggleSaveJob?.(job)}
-                      className="absolute top-4 right-4 p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
-                      title="রিমুভ করুন"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div>
+                      <button
+                        onClick={() => onToggleSaveJob?.(job)}
+                        className="absolute top-4 right-4 p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                        title="রিমুভ করুন"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
 
-                    <div className="flex justify-between items-start mb-4 pr-8">
-                      <div className={cn(
-                        "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                        job.category === 'সরকারি' ? "bg-red-50 text-red-600" :
-                        job.category === 'ব্যাংক' ? "bg-blue-50 text-blue-600" :
-                        job.category === 'এনজিও' ? "bg-purple-50 text-purple-600" :
-                        "bg-emerald-50 text-emerald-600"
-                      )}>
-                        {job.category}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4 mb-4">
-                      {job.companyLogoUrl ? (
-                        <img 
-                          src={job.companyLogoUrl} 
-                          alt={job.company} 
-                          className="w-12 h-12 rounded-xl object-contain bg-gray-50 p-1 border border-gray-100"
-                          referrerPolicy="no-referrer"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100">
-                          <Building2 className="w-6 h-6 text-gray-400" />
+                      <div className="flex justify-between items-start mb-4 pr-8">
+                        <div className={cn(
+                          "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                          job.category === 'সরকারি' ? "bg-red-50 text-red-600" :
+                          job.category === 'ব্যাংক' ? "bg-blue-50 text-blue-600" :
+                          job.category === 'এনজিও' ? "bg-purple-50 text-purple-600" :
+                          "bg-emerald-50 text-emerald-600"
+                        )}>
+                          {job.category}
                         </div>
-                      )}
-                      <div>
-                        <h4 className="text-lg font-bold group-hover:text-emerald-600 transition-colors leading-tight">{job.title}</h4>
-                        <p className="text-gray-600 text-sm mt-0.5">{job.company}</p>
                       </div>
-                    </div>
+                      
+                      <div className="flex items-center gap-4 mb-4">
+                        {job.companyLogoUrl ? (
+                          <img 
+                            src={job.companyLogoUrl} 
+                            alt={job.company} 
+                            className="w-12 h-12 rounded-xl object-contain bg-gray-50 p-1 border border-gray-100"
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center border border-gray-100">
+                            <Building2 className="w-6 h-6 text-gray-400" />
+                          </div>
+                        )}
+                        <div>
+                          <h4 className="text-lg font-bold group-hover:text-emerald-600 transition-colors leading-tight">{job.title}</h4>
+                          <p className="text-gray-600 text-sm mt-0.5">{job.company}</p>
+                        </div>
+                      </div>
 
-                    <div className="flex items-center gap-4 text-xs text-gray-500 mb-6">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {job.location}
-                      </div>
-                      {job.salary && (
+                      <div className="flex items-center gap-4 text-xs text-gray-500 mb-6">
                         <div className="flex items-center gap-1">
-                          <Landmark className="w-3 h-3" />
-                          {job.salary}
+                          <MapPin className="w-3 h-3" />
+                          {job.location}
                         </div>
-                      )}
+                        {job.salary && (
+                          <div className="flex items-center gap-1">
+                            <Landmark className="w-3 h-3" />
+                            {job.salary}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex gap-3">
@@ -606,9 +724,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                         বিস্তারিত দেখুন
                       </button>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
           </div>
         ) : activeTab === 'orders' ? (
