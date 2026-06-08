@@ -683,16 +683,23 @@ export const dbClient = {
   },
 
   async login(username: string, password: string) {
+    const cleanUsername = (username || "").trim().toLowerCase();
     let users = await runQueryWithFallback<any[]>(
       async () => supabase.from("users").select("*").eq("password", password),
       () => sqliteDb.prepare("SELECT * FROM users WHERE password = ?").all(password) as any[]
     );
 
-    let user = users?.find(u => String(u.username).toLowerCase() === username.toLowerCase());
+    let user = users?.find(u => 
+      String(u.username).toLowerCase() === cleanUsername || 
+      (u.mobile && String(u.mobile).trim() === cleanUsername)
+    );
     if (!user) {
       try {
         const localUsers = sqliteDb.prepare("SELECT * FROM users WHERE password = ?").all(password) as any[];
-        user = localUsers?.find(u => String(u.username).toLowerCase() === username.toLowerCase());
+        user = localUsers?.find(u => 
+          String(u.username).toLowerCase() === cleanUsername || 
+          (u.mobile && String(u.mobile).trim() === cleanUsername)
+        );
       } catch (e) {}
     }
     return user || null;
