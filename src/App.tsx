@@ -6088,13 +6088,15 @@ export default function App() {
                         </>
                       )}
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-gray-400 uppercase">ইউজারনেম {authMode === 'register' ? '(অটো জেনারেটেড)' : ''} <span className="text-red-500">*</span></label>
+                        <label className="text-xs font-bold text-gray-400 uppercase">
+                          {authMode === 'login' ? 'ইউজারনেম বা মোবাইল নম্বর' : 'ইউজারনেম'} {authMode === 'register' ? '(অটো জেনারেটেড)' : ''} <span className="text-red-500">*</span>
+                        </label>
                         <input 
                           type="text"
                           required
                           readOnly={authMode === 'register'}
                           className={`w-full px-4 py-3 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 ${authMode === 'register' ? 'bg-gray-100 cursor-not-allowed' : 'bg-gray-50'}`}
-                          placeholder={authMode === 'register' ? "নাম লিখলে অটো তৈরি হবে" : "আপনার ইউজারনেম"}
+                          placeholder={authMode === 'register' ? "নাম লিখলে অটো তৈরি হবে" : "আপনার ইউজারনেম বা মোবাইল নম্বর"}
                           value={loginCredentials.username}
                           onChange={(e) => setLoginCredentials({...loginCredentials, username: e.target.value})}
                         />
